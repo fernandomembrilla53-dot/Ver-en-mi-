@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#176b4d">
+<title>ver-en-mi</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f3f7f2;color:#20372d;font-family:system-ui,Arial}
+header{background:linear-gradient(135deg,#145c42,#45a875);color:white;padding:25px 18px 30px;border-radius:0 0 25px 25px}
+header small{letter-spacing:2px;font-size:11px}h1{margin:8px 0;font-size:30px}header p{margin:0}
+main{max-width:700px;margin:auto;padding:15px}
+nav{display:flex;gap:6px;overflow:auto;margin:0 0 15px}
+nav button{flex:1;min-width:78px;padding:12px 7px;border:0;border-radius:12px;background:#e0e9df;color:#24523d;font-weight:700}
+nav button.active{background:#176b4d;color:white}
+.card{background:white;padding:17px;border-radius:17px;margin-bottom:14px;box-shadow:0 3px 14px #173d2010}
+h2{font-size:20px;margin:0 0 13px}h3{margin:8px 0;font-size:16px}
+p{line-height:1.5}.muted{color:#66786c;font-size:13px}
+label{display:block;font-size:13px;font-weight:650;margin:12px 0 5px}
+input,select{width:100%;padding:12px;border:1px solid #d7e2d7;border-radius:10px;background:white;font:inherit;color:#20372d}
+button.primary{background:#176b4d;color:white;border:0;padding:12px 15px;border-radius:11px;font-weight:700;width:100%;margin-top:12px}
+.item{display:flex;gap:10px;align-items:flex-start;padding:11px 0;border-bottom:1px solid #edf1ed}
+.item:last-child{border-bottom:0}.item input{width:20px;margin-top:4px;accent-color:#19845c}
+.item strong{display:block}.item small{color:#718075}
+.pill{display:inline-block;background:#e5f4e8;color:#236745;border-radius:20px;padding:5px 9px;font-size:12px;font-weight:700}
+.meal{border-left:4px solid #69ad7e;padding:8px 0 8px 12px;margin:12px 0}
+.hidden{display:none}.stat{display:flex;justify-content:space-between;gap:12px;align-items:center}
+.big{font-size:25px;font-weight:800;color:#176b4d}
+footer{text-align:center;font-size:12px;color:#718075;padding:12px}
+</style>
+</head>
+<body>
+<header>
+<small>BIENESTAR · ALIMENTACIÓN · MOVIMIENTO</small>
+<h1>ver-en-mi 🌿</h1>
+<p>Mejorá tus hábitos, un día a la vez.</p>
+</header>
+<main>
+<nav>
+<button class="active" data-tab="inicio">🏠 Inicio</button>
+<button data-tab="comidas">🥗 Comidas</button>
+<button data-tab="ejercicio">🏃 Ejercicio</button>
+<button data-tab="progreso">📈 Progreso</button>
+<button data-tab="semana">📅 Semana</button>
+<button data-tab="personalizado">🎯 Mi plan</button>
+</nav>
+
+<section id="inicio">
+<div class="card">
+<h2>👤 Tu perfil</h2>
+<label>Tu nombre</label><input id="nombre" placeholder="¿Cómo te llamás?">
+<label>Edad</label><input id="edad" type="number" min="16" max="100" placeholder="Edad">
+<label>Tu objetivo</label>
+<select id="objetivo"><option>Reducir grasa y mejorar hábitos</option><option>Mejorar mi alimentación</option><option>Ganar fuerza y condición física</option></select>
+<label>Alimentación</label>
+<select id="alimentacion"><option>Variada</option><option>Vegetariana</option><option>Económica</option></select>
+<button class="primary" id="guardar">Guardar perfil</button>
+<p id="saludo" class="muted"></p>
+</div>
+<div class="card">
+<h2>🎯 Tu misión de hoy</h2>
+<p class="muted">Marcá cada hábito cuando lo completes.</p>
+<div id="habitos">
+<label class="item"><input type="checkbox" value="comida"><span><strong>Comí variado y respeté mi apetito</strong><small>Sin pasar hambre ni buscar perfección.</small></span></label>
+<label class="item"><input type="checkbox" value="vegetales"><span><strong>Incluí frutas o verduras</strong><small>Frescas, congeladas o de estación.</small></span></label>
+<label class="item"><input type="checkbox" value="movimiento"><span><strong>Hice movimiento adaptado a mí</strong><small>Caminar también cuenta.</small></span></label>
+<label class="item"><input type="checkbox" value="descanso"><span><strong>Reservé tiempo para descansar</strong><small>Un momento para bajar el ritmo.</small></span></label>
+</div>
+<div class="stat"><strong id="contador">0 de 4 hábitos</strong><span class="pill" id="porcentaje">0%</span></div>
+<div style="height:8px;background:#e6eee6;border-radius:9px;margin-top:10px"><div id="barra" style="height:8px;width:0;background:#299464;border-radius:9px"></div></div>
+</div>
+<div class="card"><h2>🌱 Consejo del día</h2><p>Tomá agua regularmente, buscá variedad en tus comidas y elegí una actividad que puedas sostener. Los cambios pequeños y constantes valen más que las soluciones extremas.</p></div>
+</section>
+
+<section id="comidas" class="hidden">
+<div class="card">
+<h2>🥗 Ideas de comidas económicas</h2>
+<p class="muted">Elegí por hambre, gustos, presupuesto y disponibilidad. No hace falta seguir un menú rígido.</p>
+<div class="meal"><span class="pill">Desayuno</span><h3>Avena con fruta</h3><p>Avena con leche o yogur y banana o fruta de estación. También podés elegir tostadas con huevo.</p></div>
+<div class="meal"><span class="pill">Almuerzo</span><h3>Plato completo</h3><p>Arroz, lentejas o porotos con verduras y huevo, pollo u otra proteína que consumas.</p></div>
+<div class="meal"><span class="pill">Merienda</span><h3>Algo sencillo</h3><p>Fruta con yogur, o pan con queso. Adaptá la porción a tu apetito.</p></div>
+<div class="meal"><span class="pill">Cena</span><h3>Tortilla con verduras</h3><p>Tortilla de papa, zapallito o acelga acompañada de ensalada o verduras cocidas.</p></div>
+</div>
+<div class="card"><h2>🛒 Compras para organizarte</h2>
+<div class="item"><span>✓</span><span>Legumbres, arroz, avena y fideos</span></div>
+<div class="item"><span>✓</span><span>Huevos, yogur y otras proteínas según tus preferencias</span></div>
+<div class="item"><span>✓</span><span>Frutas y verduras de estación</span></div>
+<div class="item"><span>✓</span><span>Agua y alimentos básicos que uses habitualmente</span></div>
+<p class="muted">Si tenés alergias, diabetes, enfermedad renal, embarazo u otra necesidad especial, consultá a un profesional para adaptar la alimentación.</p>
+</div>
+</section>
+
+<section id="ejercicio" class="hidden">
+<div class="card"><h2>🏃 Rutina inicial en casa</h2><span class="pill">10–15 minutos · Sin equipamiento</span>
+<p>Empezá suave, descansá cuando lo necesites y adaptá cada ejercicio a tu condición física.</p>
+<div id="rutina">
+<label class="item"><input type="checkbox" value="calentar"><span><strong>1. Entrada en calor · 3 minutos</strong><small>Marcha suave en el lugar y movilidad de hombros.</small></span></label>
+<label class="item"><input type="checkbox" value="sentarse"><span><strong>2. Sentarse y levantarse de una silla</strong><small>6–10 repeticiones controladas, si resulta cómodo.</small></span></label>
+<label class="item"><input type="checkbox" value="pared"><span><strong>3. Flexiones contra la pared</strong><small>6–10 repeticiones sin forzar.</small></span></label>
+<label class="item"><input type="checkbox" value="marcha"><span><strong>4. Marcha suave</strong><small>1–3 minutos a un ritmo que te permita hablar.</small></span></label>
+<label class="item"><input type="checkbox" value="estirar"><span><strong>5. Volver a la calma</strong><small>Respirá tranquilo y movete suavemente.</small></span></label>
+</div>
+<p class="muted">Podés empezar con menos repeticiones. Si aparece dolor en el pecho, mareo intenso o falta de aire inusual, detenete y buscá atención médica.</p>
+</div>
+<div class="card"><h2>🚶 Otra opción</h2><p>Una caminata cómoda de 10 minutos también puede ser un buen comienzo. Aumentá gradualmente según cómo te sientas.</p></div>
+</section>
+
+<section id="progreso" class="hidden">
+<div class="card"><h2>📈 Tu progreso</h2><p class="muted">Registrá los datos que te resulten útiles. El peso es opcional: los hábitos, la energía y la constancia también importan.</p>
+<label>🥗 ¿Qué comiste hoy?</label><input id="comidaDia" maxlength="300" placeholder="Anotá tus comidas"><label>💧 Vasos de agua</label><input id="aguaDia" type="number" min="0" max="50" placeholder="Ej. 6"><label>🚶 Minutos de movimiento</label><input id="movimientoDia" type="number" min="0" max="1440" placeholder="Ej. 20"><label>Peso en kg (opcional)</label><input id="peso" type="number" min="1" max="500" step="0.1" placeholder="Ej. 80,5">
+<label>Nota del día</label><input id="nota" maxlength="180" placeholder="Ej. Caminé y dormí mejor">
+<button class="primary" id="registrar">Guardar registro de hoy</button>
+</div>
+<div class="card"><h2>🗓️ Historial</h2><div id="historial"><p class="muted">Todavía no hay registros.</p></div><button class="primary" id="borrar" style="background:#7b4747">Borrar historial</button></div>
+</section>
+
+<section id="semana" class="hidden">
+<div class="card">
+<h2>📅 Tu plan semanal</h2>
+<p>Una guía flexible y económica. Cambiá comidas según tus gustos, hambre y lo que tengas en casa.</p>
+<p id="avisoPlan" class="pill">Hábitos sostenibles</p>
+<p class="muted">Las cantidades dependen de tus necesidades; no hace falta pasar hambre ni seguir el menú a rajatabla.</p>
+</div>
+<div class="card"><span class="pill">Lunes</span>
+<div class="meal"><h3>🥣 Desayuno</h3>Avena con leche o yogur y fruta.</div>
+<div class="meal"><h3>🍲 Almuerzo</h3>Lentejas con verduras y arroz.</div>
+<div class="meal"><h3>🍎 Merienda</h3>Fruta y tostadas con queso.</div>
+<div class="meal"><h3>🍳 Cena</h3>Tortilla de verduras con ensalada.</div>
+<p>🏃 Movimiento: caminata cómoda de 10–15 minutos.</p></div>
+<div class="card"><span class="pill">Martes</span>
+<div class="meal"><h3>🥣 Desayuno</h3>Tostadas con huevo y una fruta.</div>
+<div class="meal"><h3>🍲 Almuerzo</h3>Arroz con verduras, porotos y huevo o pollo.</div>
+<div class="meal"><h3>🍎 Merienda</h3>Yogur con avena o fruta.</div>
+<div class="meal"><h3>🍳 Cena</h3>Fideos con salsa de tomate y verduras.</div>
+<p>🏃 Movimiento: rutina suave en casa, según tu nivel.</p></div>
+<div class="card"><span class="pill">Miércoles</span>
+<div class="meal"><h3>🥣 Desayuno</h3>Yogur o leche con avena y banana.</div>
+<div class="meal"><h3>🍲 Almuerzo</h3>Ensalada completa de garbanzos, tomate y huevo.</div>
+<div class="meal"><h3>🍎 Merienda</h3>Pan con queso y fruta.</div>
+<div class="meal"><h3>🍳 Cena</h3>Pollo o legumbres con papa y verduras al horno.</div>
+<p>🏃 Movimiento: caminata o actividad que disfrutes.</p></div>
+<div class="card"><span class="pill">Jueves</span>
+<div class="meal"><h3>🥣 Desayuno</h3>Tostadas con queso y fruta.</div>
+<div class="meal"><h3>🍲 Almuerzo</h3>Guiso casero de porotos con verduras.</div>
+<div class="meal"><h3>🍎 Merienda</h3>Yogur con fruta o avena.</div>
+<div class="meal"><h3>🍳 Cena</h3>Tarta de acelga o zapallitos con ensalada.</div>
+<p>🏃 Movimiento: rutina suave en casa o descanso activo.</p></div>
+<div class="card"><span class="pill">Viernes</span>
+<div class="meal"><h3>🥣 Desayuno</h3>Avena con fruta de estación.</div>
+<div class="meal"><h3>🍲 Almuerzo</h3>Arroz salteado con verduras y huevo.</div>
+<div class="meal"><h3>🍎 Merienda</h3>Tostadas con queso o yogur.</div>
+<div class="meal"><h3>🍳 Cena</h3>Hamburguesas caseras de lentejas o carne con verduras.</div>
+<p>🏃 Movimiento: paseo o caminata cómoda.</p></div>
+<div class="card"><span class="pill">Sábado</span>
+<div class="meal"><h3>🥣 Desayuno</h3>Pan con huevo o queso y una fruta.</div>
+<div class="meal"><h3>🍲 Almuerzo</h3>Polenta con salsa y verduras, con proteína a elección.</div>
+<div class="meal"><h3>🍎 Merienda</h3>Fruta y yogur o una tostada.</div>
+<div class="meal"><h3>🍳 Cena</h3>Pizza casera con verduras y queso.</div>
+<p>🏃 Movimiento: actividad recreativa que te guste.</p></div>
+<div class="card"><span class="pill">Domingo</span>
+<div class="meal"><h3>🥣 Desayuno</h3>Elegí un desayuno que disfrutes.</div>
+<div class="meal"><h3>🍲 Almuerzo</h3>Comida casera variada con verduras y una proteína.</div>
+<div class="meal"><h3>🍎 Merienda</h3>Fruta, yogur o tostadas, según tu apetito.</div>
+<div class="meal"><h3>🍳 Cena</h3>Reutilizá sobras de forma segura o prepará una tortilla con verduras.</div>
+<p>🏃 Movimiento: descanso o paseo suave.</p></div>
+<div class="card">
+<h2>🛒 Organización de la semana</h2>
+<p>Revisá qué tenés en casa, elegí frutas y verduras de estación, cociná legumbres para varias comidas y guardá las sobras de forma segura. Para la opción vegetariana, usá lentejas, porotos, garbanzos, huevos o lácteos según tus preferencias.</p>
+<button class="primary" onclick="document.querySelector('[data-tab=progreso]').click()">📈 Registrar mi progreso</button>
+</div>
+<div class="card"><h2>💚 Recordatorio</h2>
+<p>Este menú es una idea general, no una dieta clínica ni una garantía de pérdida de peso. Si tenés una condición médica, alergias o necesidades nutricionales especiales, consultá a un profesional.</p></div>
+</section>
+
+
+<section id="personalizado" class="hidden">
+<div class="card">
+<h2>🎯 Tu plan personalizado</h2>
+<p>Contanos tus preferencias para recibir ideas prácticas de alimentación y movimiento.</p>
+<label>Tu objetivo</label>
+<select id="ppObjetivo">
+<option value="habitos">Mejorar mis hábitos</option>
+<option value="grasa">Reducir grasa corporal gradualmente</option>
+<option value="fuerza">Mejorar fuerza y condición física</option>
+</select>
+<label>Tu edad</label>
+<input id="ppEdad" type="number" min="18" max="100" placeholder="Edad (18 o más)">
+<label>Tipo de alimentación</label>
+<select id="ppAlimentacion">
+<option value="variada">Variada</option>
+<option value="vegetariana">Vegetariana</option>
+</select>
+<label>Presupuesto para las comidas</label>
+<select id="ppPresupuesto">
+<option value="ajustado">Ajustado: priorizar economía</option>
+<option value="medio">Moderado: más variedad</option>
+</select>
+<label>Nivel de actividad actual</label>
+<select id="ppActividad">
+<option value="inicial">Estoy empezando</option>
+<option value="medio">Me muevo regularmente</option>
+<option value="alto">Tengo buena actividad física</option>
+</select>
+<button class="primary" id="crearPlan">Crear mi propuesta</button>
+<p class="muted">La propuesta es orientativa. No calcula calorías ni reemplaza una evaluación profesional.</p>
+</div>
+<div class="card hidden" id="resultadoPlan" aria-live="polite"></div>
+</section>
+
+<footer>ver-en-mi · Bienestar sin extremos 🌿<br>Información general; no reemplaza atención profesional.</footer>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const leer=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}};
+const guardar=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
+const hoy=()=>new Date().toLocaleDateString('sv-SE');
+function cargarPerfil(){
+const p=leer('vf_perfil',{});
+['nombre','edad','objetivo','alimentacion'].forEach(k=>{if(p[k]!==undefined)$(k).value=p[k]});
+$('saludo').textContent=p.nombre?'¡Vamos, '+p.nombre+'! Cada paso cuenta.':'Tu plan empieza con pequeños hábitos.';
+}
+function cargarHabitos(){
+const data=leer('vf_habitos',{});
+const valores=data[hoy()]||[];
+document.querySelectorAll('#habitos input').forEach(c=>c.checked=valores.includes(c.value));
+actualizarHabitos();
+}
+function actualizarHabitos(){
+const checks=[...document.querySelectorAll('#habitos input')];
+const n=checks.filter(c=>c.checked).length;
+$('contador').textContent=n+' de 4 hábitos completados';
+$('porcentaje').textContent=Math.round(n/4*100)+'%';
+$('barra').style.width=(n/4*100)+'%';
+const data=leer('vf_habitos',{});
+data[hoy()]=checks.filter(c=>c.checked).map(c=>c.value);
+guardar('vf_habitos',data);
+}
+function cargarRutina(){
+const r=leer('vf_rutina',{});
+document.querySelectorAll('#rutina input').forEach(c=>c.checked=(r[hoy()]||[]).includes(c.value));
+}
+function mostrarHistorial(){
+const arr=leer('vf_historial',[]);
+$('historial').innerHTML=arr.length?arr.slice().reverse().map(r=>'<div class="item"><span>📅</span><span><strong>'+r.fecha+'</strong><small>'+(r.peso?'Peso: '+r.peso+' kg · ':'')+(r.nota||'Sin nota')+
+((r.habitos!==undefined)?' · Hábitos: '+r.habitos+'/4':'')+
+((r.ejercicios!==undefined)?' · Ejercicios: '+r.ejercicios+'/5':'')+((r.comidas)?' · Comidas: '+r.comidas:'')+((r.agua!==undefined&&r.agua!=='')?' · Agua: '+r.agua+' vasos':'')+((r.movimiento!==undefined&&r.movimiento!=='')?' · Movimiento: '+r.movimiento+' min':'')+'</small></span></div>').join(''):'<p class="muted">Todavía no hay registros.</p>';
+}
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
+document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('active',x===b));
+document.querySelectorAll('main section').forEach(s=>s.classList.toggle('hidden',s.id!==b.dataset.tab));
+if(b.dataset.tab==='progreso')mostrarHistorial();
+});
+$('guardar').onclick=()=>{
+guardar('vf_perfil',{nombre:$('nombre').value.trim(),edad:$('edad').value,objetivo:$('objetivo').value,alimentacion:$('alimentacion').value});
+cargarPerfil();alert('Perfil guardado en este navegador.');
+};
+document.querySelectorAll('#habitos input').forEach(c=>c.onchange=actualizarHabitos);
+document.querySelectorAll('#rutina input').forEach(c=>c.onchange=()=>{
+const r=leer('vf_rutina',{});
+r[hoy()]=[...document.querySelectorAll('#rutina input:checked')].map(x=>x.value);
+guardar('vf_rutina',r);
+});
+$('registrar').onclick=()=>{
+const peso=$('peso').value,nota=$('nota').value.trim();
+const comidas=$('comidaDia').value.trim(),agua=$('aguaDia').value,movimiento=$('movimientoDia').value;
+if(peso&&(+peso<=0||+peso>500)){alert('Revisá el peso ingresado.');return}
+const arr=leer('vf_historial',[]);
+const habitosHoy=document.querySelectorAll('#habitos input:checked').length;
+const ejerciciosHoy=document.querySelectorAll('#rutina input:checked').length;
+arr.push({fecha:hoy(),peso,nota,comidas,agua,movimiento,habitos:habitosHoy,ejercicios:ejerciciosHoy});
+guardar('vf_historial',arr);
+$('peso').value='';$('nota').value='';$('comidaDia').value='';$('aguaDia').value='';$('movimientoDia').value='';
+mostrarHistorial();alert('Registro guardado.');
+};
+$('borrar').onclick=()=>{
+if(confirm('¿Querés borrar todo el historial de progreso?')){
+guardar('vf_historial',[]);mostrarHistorial();
+}
+};
+
+function generarPlanPersonalizado(){
+  const edad=Number($('ppEdad').value);
+  if(!Number.isFinite(edad)||edad<18||edad>100){
+    alert('Ingresá una edad válida entre 18 y 100 años para usar esta versión.');
+    return;
+  }
+  const objetivo=$('ppObjetivo').value;
+  const vegetariana=$('ppAlimentacion').value==='vegetariana';
+  const economico=$('ppPresupuesto').value==='ajustado';
+  const actividad=$('ppActividad').value;
+  const proteina=vegetariana
+    ? 'lentejas, garbanzos o porotos; agregá huevo o lácteos si los consumís'
+    : 'huevo, pollo, pescado o legumbres, según tus preferencias';
+  const almuerzo=economico
+    ? 'Guiso casero de lentejas con verduras y arroz'
+    : 'Plato de arroz o papa con verduras y una fuente de proteína';
+  const cena=vegetariana
+    ? 'Tortilla de verduras o ensalada completa con legumbres'
+    : 'Tortilla de verduras o pollo con verduras y papa';
+  const movimiento={
+    inicial:'Empezá con caminatas cómodas de 10 minutos y movimientos suaves en casa, descansando cuando lo necesites.',
+    medio:'Alterná caminatas de 15–30 minutos con ejercicios suaves de fuerza, según tu comodidad.',
+    alto:'Combiná actividad aeróbica con fuerza y días de recuperación, adaptando la carga a tu experiencia.'
+  }[actividad];
+  const meta={
+    habitos:'Elegí horarios y comidas que puedas sostener, tomá agua regularmente y cuidá el descanso.',
+    grasa:'Priorizá comidas variadas y saciantes, respetá el hambre y evitá dietas extremas o saltarte comidas para compensar.',
+    fuerza:'Incluí fuentes de proteína, comidas suficientes y ejercicios de fuerza progresivos con buena técnica.'
+  }[objetivo];
+  const desayuno=economico
+    ? 'Avena con fruta o tostadas con huevo'
+    : 'Yogur o leche con avena y fruta, o tostadas con huevo';
+  const merienda=vegetariana
+    ? 'Fruta, yogur o tostadas con queso si consumís lácteos'
+    : 'Fruta con yogur, o tostadas con queso o huevo';
+  $('resultadoPlan').innerHTML=
+    '<h2>🌿 Tu propuesta</h2>'+
+    '<p><span class="pill">Desayuno</span><br>'+desayuno+'</p>'+
+    '<p><span class="pill">Almuerzo</span><br>'+almuerzo+'</p>'+
+    '<p><span class="pill">Merienda</span><br>'+merienda+'</p>'+
+    '<p><span class="pill">Cena</span><br>'+cena+'</p>'+
+    '<h3>🎯 Enfoque</h3><p>'+meta+'</p>'+
+    '<h3>🏃 Movimiento</h3><p>'+movimiento+'</p>'+
+    '<h3>🛒 Para organizarte</h3><p>Priorizá alimentos de estación. '+proteina+'. Elegí porciones según tu apetito y necesidades.</p>'+
+    '<p class="muted">Esta es una sugerencia general, no una dieta clínica ni una prescripción individual. Si tenés una condición médica, tomás medicación o necesitás una dieta especial, consultá a un profesional.</p>';
+  $('resultadoPlan').innerHTML += '<p><button class="primary" id="guardarPlanPersonalizado">💾 Guardar mi plan</button></p>';
+  $('guardarPlanPersonalizado').onclick=guardarPlanPersonalizado;
+  $('resultadoPlan').classList.remove('hidden');
+}
+function guardarPlanPersonalizado(){
+  guardar('vf_plan_personalizado',{
+    edad:$('ppEdad').value,
+    objetivo:$('ppObjetivo').value,
+    alimentacion:$('ppAlimentacion').value,
+    presupuesto:$('ppPresupuesto').value,
+    actividad:$('ppActividad').value,
+    html:$('resultadoPlan').innerHTML
+  });
+  alert('¡Plan guardado en este navegador!');
+}
+$('crearPlan').addEventListener('click',generarPlanPersonalizado);
+
+const planGuardado=leer('vf_plan_personalizado',null);
+if(planGuardado){
+  $('ppEdad').value=planGuardado.edad||'';
+  $('ppObjetivo').value=planGuardado.objetivo||'habitos';
+  $('ppAlimentacion').value=planGuardado.alimentacion||'variada';
+  $('ppPresupuesto').value=planGuardado.presupuesto||'ajustado';
+  $('ppActividad').value=planGuardado.actividad||'inicial';
+  if(planGuardado.html){
+    $('resultadoPlan').innerHTML=planGuardado.html;
+    $('resultadoPlan').classList.remove('hidden');
+    if($('guardarPlanPersonalizado'))
+      $('guardarPlanPersonalizado').onclick=guardarPlanPersonalizado;
+  }
+}
+
+const perfilPlan=leer('vf_perfil',{});
+if(perfilPlan.alimentacion==='Vegetariana'){
+$('avisoPlan').textContent='Opción vegetariana: priorizá legumbres, huevos y lácteos si los consumís.';
+}else if(perfilPlan.alimentacion==='Económica'){
+$('avisoPlan').textContent='Enfoque económico: elegí alimentos de estación y cociná por tandas.';
+}else{
+$('avisoPlan').textContent='Objetivo: '+(perfilPlan.objetivo||'mejorar hábitos')+'. Adaptá las comidas a tu apetito.';
+}
+cargarPerfil();cargarHabitos();cargarRutina();mostrarHistorial();
+</script>
+</body>
+</html>
