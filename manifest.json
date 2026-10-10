@@ -33,7 +33,7 @@
     {
       "src": "./inicio.png",
       "sizes": "691x1536",
-      "type": "image/png",
+      "type": "image/jpeg",
       "form_factor": "narrow",
       "label": "Pantalla de inicio de ver-en-mi"
     },
