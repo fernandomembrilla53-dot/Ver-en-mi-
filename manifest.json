@@ -1,3 +1,4 @@
+
 {
   "id": "./",
   "name": "ver-en-mi",
@@ -10,22 +11,38 @@
   "theme_color": "#176b4d",
   "icons": [
     {
-      "src": "icon-192.png",
+      "src": "./icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "icon-512.png",
+      "src": "./icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "icon.svg",
+      "src": "./icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "./inicio.png",
+      "sizes": "691x1536",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Pantalla de inicio de ver-en-mi"
+    },
+    {
+      "src": "./progreso.png",
+      "sizes": "691x1536",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Seguimiento de progreso"
     }
   ],
   "orientation": "portrait",
