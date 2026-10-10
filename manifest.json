@@ -40,7 +40,7 @@
     {
       "src": "./progreso.png",
       "sizes": "691x1536",
-      "type": "image/png",
+      "type": "image/jpeg",
       "form_factor": "narrow",
       "label": "Seguimiento de progreso"
     }
