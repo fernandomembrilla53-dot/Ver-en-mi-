@@ -1,0 +1,10 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.verenmi.app",
+    "sha256_cert_fingerprints": [
+      "23:67:3D:B9:0E:BA:A3:6F:03:10:17:7F:B0:59:3D:DB:F3:C5:5A:9F:07:E1:A5:D5:36:D9:4B:CB:DE:08:B3:90"
+    ]
+  }
+}]
