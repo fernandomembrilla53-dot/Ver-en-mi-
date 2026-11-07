@@ -2,12 +2,12 @@
   "id": "./",
   "name": "Ver en Mi · Bienestar diario",
   "short_name": "Ver en Mi",
-  "description": "Menús variados y rutinas adaptables que se renuevan cada día, sin extremos.",
+  "description": "Tu espacio diario de bienestar. Comidas variadas, rutinas progresivas y avances, a tu ritmo.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#176b4d",
+  "background_color": "#f4f6f1",
+  "theme_color": "#104946",
   "icons": [
     {
       "src": "./icon-192.png",

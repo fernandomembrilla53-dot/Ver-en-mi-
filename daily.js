@@ -131,13 +131,18 @@ const routineOf=(date,p)=>{
  const steps=t.variants[variant].map(x=>x.replaceAll('{n}',String(reps)).replaceAll('{min}',String(minutes)));
  return {title:t.title,kind:t.kind,steps,stage:s,minutes};
 };
-const mealCard=(label,value)=>'<div class="meal"><span class="pill">'+label+'</span><h3>'+safe(value)+'</h3></div>';
+const mealIcons={
+ 'Desayuno':'<circle cx="12" cy="12" r="4"/><path d="M12 2v3m0 14v3M4.93 4.93l2.12 2.12m9.9 9.9 2.12 2.12M2 12h3m14 0h3M4.93 19.07l2.12-2.12m9.9-9.9 2.12-2.12"/>',
+ 'Almuerzo':'<path d="M4 13h16c0 4.5-3.8 8-8 8s-8-3.5-8-8Z"/><path d="M7 13c-1-3 0-4 2-6m5 6c1-3 3-5 5-5"/>',
+ 'Merienda':'<path d="M4 7h13v8a6.5 6.5 0 0 1-13 0V7Zm13 2h2a3 3 0 0 1 0 6h-2M4 21h16"/>',
+ 'Cena':'<path d="M20 15.5A8.5 8.5 0 0 1 8.5 4 8.5 8.5 0 1 0 20 15.5Z"/><path d="M17 3v4m-2-2h4"/>'
+};
+const mealCard=(label,value)=>'<div class="meal"><span class="meal-symbol" aria-hidden="true"><svg viewBox="0 0 24 24">'+(mealIcons[label]||mealIcons.Almuerzo)+'</svg></span><div class="meal-text"><span class="pill">'+safe(label)+'</span><h3>'+safe(value)+'</h3></div></div>';
 const dateFromKey=key=>{const [y,m,d]=key.split('-').map(Number);return new Date(y,m-1,d)};
 function renderMeals(){
  const root=document.querySelector('#comidas > .card');if(!root)return;
  const now=today(),p=preferences(),m=menuOf(now,p);
- root.innerHTML='<div class="eyebrow">PROPUESTA DEL DÍA</div><h2>Comé distinto cada día</h2>'+
-  '<p class="muted">'+safe(formatDate(now))+' · Menú '+(dayIndex(now)+1)+' de 28 · '+(p.veg?'Vegetariano':'Variado')+'</p>'+
+ root.innerHTML='<div class="menu-intro"><div><div class="eyebrow">TU INSPIRACIÓN DE HOY</div><h2>Comé rico, sentite bien</h2><p class="muted">'+safe(formatDate(now))+' · '+(p.veg?'Opción vegetariana':'Menú variado')+'</p></div><div class="menu-number"><strong>'+String(dayIndex(now)+1)+'</strong><span>de 28</span></div></div>'+
   mealCard('Desayuno',m.breakfast)+mealCard('Almuerzo',m.lunch)+mealCard('Merienda',m.snack)+mealCard('Cena',m.dinner)+
   '<p class="muted">Son ideas flexibles, no una dieta estricta. Ajustá cantidades según tu apetito y necesidades; podés intercambiar platos. Agua según tu sed y circunstancias.</p>';
  const shopping=document.querySelector('#comidas > .card:nth-child(2) .muted');
@@ -188,11 +193,21 @@ function renderHome(){
  const sec=el('inicio');if(!sec)return;
  let card=el('vemHoy');if(!card){card=document.createElement('div');card.id='vemHoy';card.className='card spotlight';sec.prepend(card)}
  const now=today(),p=preferences(),m=menuOf(now,p),r=routineOf(now,p),done=read('vf_habitos',{})[dateKey(now)]||[];
- card.innerHTML='<div class="eyebrow">HOY · '+safe(formatDate(now))+'</div>'+
-  '<h2>Un día mejor, a tu ritmo</h2><div class="daily-stats"><div><strong>'+done.length+'/4</strong><small>Hábitos de hoy</small></div><div><strong>'+(r.stage+1)+'/5</strong><small>Nivel de movimiento</small></div><div><strong>'+(dayIndex(now)+1)+'/28</strong><small>Menú del ciclo</small></div></div>'+
-  '<p><strong>Almuerzo:</strong> '+safe(m.lunch)+'</p><p><strong>Movimiento:</strong> '+safe(r.title)+'</p>'+
-  '<div class="quick-actions"><button type="button" data-go="comidas">Ver comidas</button><button type="button" data-go="ejercicio">Ver rutina</button></div>'+
-  '<p class="muted">Se actualiza cada día, incluso sin conexión. Tus datos permanecen en este dispositivo.</p>';
+ const h=el('heroFecha');if(h)h.textContent=formatDate(now);
+ const count=Math.min(4,done.length),pct=Math.round(count/4*100);
+ const movement='<path d="m6 9-3 3 3 3m12-6 3 3-3 3M7 7v10m10-10v10M7 12h10"/>';
+ const calendar='<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4M17 3v4M3 10h18"/>';
+ const food='<path d="M4 13h16c0 4.5-3.8 8-8 8s-8-3.5-8-8Zm3 0c-1-3 0-4 2-6"/>';
+ const run='<path d="M7 17c3 0 4-2 4-5l2-2m0 0 3 3m-3-3-3-2m7 13-4-4m-4-8-3 3"/><circle cx="15" cy="4" r="2"/>';
+ card.innerHTML='<div class="spot-head"><div><div class="spot-headline">HOY · '+safe(formatDate(now))+'</div>'+
+  '<h2>Tu día, tu progreso.</h2><p class="muted">Cada pequeño paso vale.</p></div>'+
+  '<div class="progress-ring" style="--percent:'+pct+'" role="img" aria-label="'+count+' de 4 hábitos completados"><span>'+count+'<small>de 4 hábitos</small></span></div></div>'+
+  '<div class="daily-stats"><div><span class="stat-icon mint"><svg viewBox="0 0 24 24">'+movement+'</svg></span><span><strong>'+(r.stage+1)+'/5</strong><small>Etapa actual</small></span></div>'+
+  '<div><span class="stat-icon peach"><svg viewBox="0 0 24 24">'+calendar+'</svg></span><span><strong>'+(dayIndex(now)+1)+'/28</strong><small>Menú del ciclo</small></span></div></div>'+
+  '<div class="day-preview-grid"><div class="day-preview"><div class="preview-top"><span class="preview-symbol"><svg viewBox="0 0 24 24">'+food+'</svg></span><small>PARA COMER RICO</small></div><strong>'+safe(m.lunch)+'</strong></div>'+
+  '<div class="day-preview motion"><div class="preview-top"><span class="preview-symbol"><svg viewBox="0 0 24 24">'+run+'</svg></span><small>PARA MOVERTE</small></div><strong>'+safe(r.title)+'</strong></div></div>'+
+  '<div class="quick-actions"><button type="button" data-go="comidas">Explorar comidas</button><button type="button" data-go="ejercicio">Ver mi rutina</button></div>'+
+  '<p class="spot-note">Planes renovados cada día · Datos guardados en este celular.</p>';
  card.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>{const nav=document.querySelector('nav button[data-tab="'+b.dataset.go+'"]');if(nav)nav.click()}));
 }
 function renderMyPlan(){
@@ -226,6 +241,15 @@ function enhanceProgress(){
 }
 function renderAll(){renderMeals();renderRoutine();renderWeek();renderHome();renderMyPlan()}
 function init(){
+ const toggle=el('tema');
+ const moon='<path d="M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13Z"/>';
+ const sun='<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/>';
+ const applyTheme=(mode)=>{
+  document.documentElement.dataset.theme=mode;
+  if(toggle){toggle.setAttribute('aria-label',mode==='dark'?'Activar modo claro':'Activar modo oscuro');toggle.title=mode==='dark'?'Modo claro':'Modo oscuro';toggle.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true">'+(mode==='dark'?sun:moon)+'</svg>'}
+ };
+ applyTheme(read('vem_tema','light')==='dark'?'dark':'light');
+ if(toggle)toggle.addEventListener('click',()=>{const mode=document.documentElement.dataset.theme==='dark'?'light':'dark';save('vem_tema',mode);applyTheme(mode)});
  const create=el('crearPlan');if(create){create.textContent='Guardar preferencias y ver mi día';create.addEventListener('click',storeMyPlan)}
  const p=read('vf_plan_personalizado',null);
  if(p&&p.edad)renderMyPlan();
@@ -234,6 +258,8 @@ function init(){
  const registrar=el('registrar');if(registrar)registrar.addEventListener('click',()=>{renderHome();renderRoutine()});
  const borrar=el('borrar');if(borrar)borrar.addEventListener('click',renderHome);
  document.querySelectorAll('nav button').forEach(b=>b.addEventListener('click',()=>{
+   document.querySelectorAll('nav button').forEach(x=>x.setAttribute('aria-current',x===b?'page':'false'));
+   window.scrollTo(0,0);
    if(b.dataset.tab==='progreso'&&typeof window.mostrarHistorial==='function')window.mostrarHistorial();
    if(b.dataset.tab==='personalizado')renderMyPlan();
  }));

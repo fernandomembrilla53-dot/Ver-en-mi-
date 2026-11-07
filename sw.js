@@ -1,5 +1,5 @@
-const CACHE="ver-en-mi-v2";
-const FILES=["./","./index.html","./daily.js","./manifest.json","./icon.svg","./icon-192.png","./icon-512.png","./privacidad.html"];
+const CACHE="ver-en-mi-v3";
+const FILES=["./","./index.html","./daily.js","./premium.css","./manifest.json","./icon.svg","./icon-192.png","./icon-512.png","./privacidad.html"];
 self.addEventListener("install",event=>{
  event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(FILES)));
  self.skipWaiting();
