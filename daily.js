@@ -229,6 +229,7 @@ function init(){
  const create=el('crearPlan');if(create){create.textContent='Guardar preferencias y ver mi día';create.addEventListener('click',storeMyPlan)}
  const p=read('vf_plan_personalizado',null);
  if(p&&p.edad)renderMyPlan();
+ document.querySelectorAll('#habitos input').forEach(input=>input.addEventListener('change',renderHome));
  const guardar=el('guardar');if(guardar)guardar.addEventListener('click',()=>{renderAll()});
  const registrar=el('registrar');if(registrar)registrar.addEventListener('click',()=>{renderHome();renderRoutine()});
  const borrar=el('borrar');if(borrar)borrar.addEventListener('click',renderHome);
