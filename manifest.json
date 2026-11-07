@@ -1,9 +1,8 @@
-
 {
   "id": "./",
-  "name": "ver-en-mi",
-  "short_name": "ver-en-mi",
-  "description": "Bienestar sin extremos",
+  "name": "Ver en Mi · Bienestar diario",
+  "short_name": "Ver en Mi",
+  "description": "Menús variados y rutinas adaptables que se renuevan cada día, sin extremos.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
@@ -33,14 +32,14 @@
     {
       "src": "./inicio.png",
       "sizes": "691x1536",
-      "type": "image/jpeg",
+      "type": "image/png",
       "form_factor": "narrow",
       "label": "Pantalla de inicio de ver-en-mi"
     },
     {
       "src": "./progreso.png",
       "sizes": "691x1536",
-      "type": "image/jpeg",
+      "type": "image/png",
       "form_factor": "narrow",
       "label": "Seguimiento de progreso"
     }
@@ -51,5 +50,9 @@
     "fitness",
     "lifestyle"
   ],
-  "lang": "es-AR"
+  "lang": "es-AR",
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ]
 }
