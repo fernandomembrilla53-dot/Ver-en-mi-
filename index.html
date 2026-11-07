@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#176b4d">
+<meta name="theme-color" content="#104946">
 <title>Ver en Mi | Bienestar diario</title>
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -66,38 +66,39 @@ button.secondary{background:#fff;color:#176b4d;border:1px solid #176b4d;border-r
 @media(max-width:390px){main{padding:12px}.card{padding:15px}.daily-stats strong{font-size:19px}.daily-stats small{font-size:10px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
 </style>
-  <link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="./premium.css">
+<link rel="manifest" href="manifest.json">
 </head>
 <body>
-<header>
-<small>BIENESTAR · ALIMENTACIÓN · MOVIMIENTO</small>
-<h1>Bienestar a tu ritmo</h1>
-<p>Mejorá tus hábitos, un día a la vez.</p>
-</header>
+<header class="hero-header">
+<div class="hero-top"><div class="brand-lockup"><span class="brand-mark"><img src="./icon.svg" alt="" width="35" height="35"></span><div><div class="brand-name">Ver en Mi</div><div class="brand-caption">BIENESTAR COTIDIANO</div></div></div><button id="tema" type="button" class="theme-toggle" aria-label="Activar modo oscuro" title="Cambiar apariencia"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13Z"/></svg></button></div>
+<div class="hero-body"><div class="hero-copy"><div class="hero-kicker">UN DÍA A LA VEZ</div><h1>Cuidarte<br><em>se siente bien.</em></h1><p class="hero-desc">Comé rico, movete a tu ritmo y disfrutá de tus pequeños logros.</p></div>
+<div class="hero-art" aria-hidden="true"><svg viewBox="0 0 260 250" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="leafA" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#d5ffd1"/><stop offset="1" stop-color="#81d9a6"/></linearGradient><linearGradient id="leafB" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f8f0bd"/><stop offset="1" stop-color="#f2ae79"/></linearGradient></defs><circle cx="155" cy="122" r="89" fill="#ecfff5" opacity=".12"/><circle cx="155" cy="122" r="69" fill="#f4fff6" opacity=".10"/><circle cx="194" cy="68" r="24" fill="url(#leafB)"/><circle cx="218" cy="118" r="3" fill="#f4e2b9"/><circle cx="90" cy="46" r="4" fill="#f4e2b9"/><path d="M116 202c-13-49-21-100-7-146 35 21 54 58 46 88-3 23-18 38-39 58Z" fill="url(#leafA)"/><path d="M116 202c-8-66 21-111 74-126 4 61-20 110-74 126Z" fill="#cbf9cb"/><path d="M116 202C81 167 45 159 31 107c55-3 89 24 103 66" fill="#97dbb4"/><path d="M116 202C90 134 104 88 110 62M116 202c23-70 49-99 72-122M116 202c-28-37-51-64-80-91" fill="none" stroke="#327e66" stroke-width="3.8" stroke-linecap="round" opacity=".62"/><path d="M78 206c37 12 84 14 130 0" fill="none" stroke="#ddfff0" stroke-width="4" stroke-linecap="round" opacity=".52"/></svg></div></div>
+<div class="hero-bottom"><span class="hero-day" id="heroFecha">Un día para vos</span><span class="hero-bottom-note">A tu manera, sin extremos</span></div></header>
 <main>
 <nav aria-label="Secciones de Ver en Mi">
-<button class="active" data-tab="inicio">🏠 Inicio</button>
-<button data-tab="comidas">🥗 Comidas</button>
-<button data-tab="ejercicio">🏃 Ejercicio</button>
-<button data-tab="progreso">📈 Progreso</button>
-<button data-tab="semana">📅 Semana</button>
-<button data-tab="personalizado">🎯 Mi plan</button>
+<button type="button" class="active" data-tab="inicio" aria-label="Inicio" aria-current="page"><span class="nav-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7M5 9v12h14V9M9 21v-7h6v7"/></svg></span><span>Inicio</span></button>
+<button type="button" class="" data-tab="comidas" aria-label="Comidas" aria-current="false"><span class="nav-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 13c0 4.2 3.6 7 8 7s8-2.8 8-7H4Zm4 0c-2-3-1-5 1-7m5 7c1-3 3-4 5-4m-4-3 2-3"/></svg></span><span>Comidas</span></button>
+<button type="button" class="" data-tab="ejercicio" aria-label="Moverme" aria-current="false"><span class="nav-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9-3 3 3 3m12-6 3 3-3 3M7 7v10m10-10v10M7 12h10"/></svg></span><span>Moverme</span></button>
+<button type="button" class="" data-tab="progreso" aria-label="Avances" aria-current="false"><span class="nav-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 20h18"/><rect x="5" y="12" width="3" height="6" rx="1"/><rect x="11" y="8" width="3" height="10" rx="1"/><rect x="17" y="4" width="3" height="14" rx="1"/></svg></span><span>Avances</span></button>
+<button type="button" class="" data-tab="semana" aria-label="Semana" aria-current="false"><span class="nav-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4M17 3v4M3 10h18m6 5 2 2 4-4"/></svg></span><span>Semana</span></button>
+<button type="button" class="" data-tab="personalizado" aria-label="Mi plan" aria-current="false"><span class="nav-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M5 21a7 7 0 0 1 14 0M19 4h3"/></svg></span><span>Mi plan</span></button>
 </nav>
 
 <section id="inicio">
 <div class="card">
-<h2>👤 Tu perfil</h2>
-<label>Tu nombre</label><input id="nombre" placeholder="¿Cómo te llamás?">
-<label>Edad</label><input id="edad" type="number" min="16" max="100" placeholder="Edad">
-<label>Tu objetivo</label>
+<div class="section-heading"><h2>Tu perfil</h2><span class="heading-tag">PERSONALIZÁ</span></div>
+<label for="nombre">Tu nombre</label><input id="nombre" placeholder="¿Cómo te llamás?">
+<label for="edad">Edad</label><input id="edad" type="number" min="16" max="100" placeholder="Edad">
+<label for="objetivo">Tu objetivo</label>
 <select id="objetivo"><option>Reducir grasa y mejorar hábitos</option><option>Mejorar mi alimentación</option><option>Ganar fuerza y condición física</option></select>
-<label>Alimentación</label>
+<label for="alimentacion">Alimentación</label>
 <select id="alimentacion"><option>Variada</option><option>Vegetariana</option><option>Económica</option></select>
 <button class="primary" id="guardar">Guardar perfil</button>
 <p id="saludo" class="muted"></p>
 </div>
 <div class="card">
-<h2>🎯 Tu misión de hoy</h2>
+<div class="section-heading"><h2>Tus hábitos de hoy</h2><span class="heading-tag">04 PASOS</span></div>
 <p class="muted">Marcá cada hábito cuando lo completes.</p>
 <div id="habitos">
 <label class="item"><input type="checkbox" value="comida"><span><strong>Comí variado y respeté mi apetito</strong><small>Sin pasar hambre ni buscar perfección.</small></span></label>
@@ -108,19 +109,19 @@ button.secondary{background:#fff;color:#176b4d;border:1px solid #176b4d;border-r
 <div class="stat"><strong id="contador">0 de 4 hábitos</strong><span class="pill" id="porcentaje">0%</span></div>
 <div style="height:8px;background:#e6eee6;border-radius:9px;margin-top:10px"><div id="barra" style="height:8px;width:0;background:#299464;border-radius:9px"></div></div>
 </div>
-<div class="card"><h2>🌱 Consejo del día</h2><p>Tomá agua regularmente, buscá variedad en tus comidas y elegí una actividad que puedas sostener. Los cambios pequeños y constantes valen más que las soluciones extremas.</p></div>
+<div class="card"><h2>Una idea para hoy</h2><p>Tomá agua regularmente, buscá variedad en tus comidas y elegí una actividad que puedas sostener. Los cambios pequeños y constantes valen más que las soluciones extremas.</p></div>
 </section>
 
 <section id="comidas" class="hidden">
 <div class="card">
-<h2>🥗 Ideas de comidas económicas</h2>
+<h2>Comidas para inspirarte</h2>
 <p class="muted">Elegí por hambre, gustos, presupuesto y disponibilidad. No hace falta seguir un menú rígido.</p>
 <div class="meal"><span class="pill">Desayuno</span><h3>Avena con fruta</h3><p>Avena con leche o yogur y banana o fruta de estación. También podés elegir tostadas con huevo.</p></div>
 <div class="meal"><span class="pill">Almuerzo</span><h3>Plato completo</h3><p>Arroz, lentejas o porotos con verduras y huevo, pollo u otra proteína que consumas.</p></div>
 <div class="meal"><span class="pill">Merienda</span><h3>Algo sencillo</h3><p>Fruta con yogur, o pan con queso. Adaptá la porción a tu apetito.</p></div>
 <div class="meal"><span class="pill">Cena</span><h3>Tortilla con verduras</h3><p>Tortilla de papa, zapallito o acelga acompañada de ensalada o verduras cocidas.</p></div>
 </div>
-<div class="card"><h2>🛒 Compras para organizarte</h2>
+<div class="card"><h2>Tu lista inteligente</h2>
 <div class="item"><span>✓</span><span>Legumbres, arroz, avena y fideos</span></div>
 <div class="item"><span>✓</span><span>Huevos, yogur y otras proteínas según tus preferencias</span></div>
 <div class="item"><span>✓</span><span>Frutas y verduras de estación</span></div>
@@ -130,7 +131,7 @@ button.secondary{background:#fff;color:#176b4d;border:1px solid #176b4d;border-r
 </section>
 
 <section id="ejercicio" class="hidden">
-<div class="card"><h2>🏃 Rutina inicial en casa</h2><span class="pill">10–15 minutos · Sin equipamiento</span>
+<div class="card"><h2>Rutina para hoy</h2><span class="pill">10–15 minutos · Sin equipamiento</span>
 <p>Empezá suave, descansá cuando lo necesites y adaptá cada ejercicio a tu condición física.</p>
 <div id="rutina">
 <label class="item"><input type="checkbox" value="calentar"><span><strong>1. Entrada en calor · 3 minutos</strong><small>Marcha suave en el lugar y movilidad de hombros.</small></span></label>
@@ -141,21 +142,21 @@ button.secondary{background:#fff;color:#176b4d;border:1px solid #176b4d;border-r
 </div>
 <p class="muted">Podés empezar con menos repeticiones. Si aparece dolor en el pecho, mareo intenso o falta de aire inusual, detenete y buscá atención médica.</p>
 </div>
-<div class="card"><h2>🚶 Otra opción</h2><p>Una caminata cómoda de 10 minutos también puede ser un buen comienzo. Aumentá gradualmente según cómo te sientas.</p></div>
+<div class="card"><h2>Un paso más</h2><p>Una caminata cómoda de 10 minutos también puede ser un buen comienzo. Aumentá gradualmente según cómo te sientas.</p></div>
 </section>
 
 <section id="progreso" class="hidden">
-<div class="card"><h2>📈 Tu progreso</h2><p class="muted">Registrá los datos que te resulten útiles. El peso es opcional: los hábitos, la energía y la constancia también importan.</p>
+<div class="card"><h2>Tus avances</h2><p class="muted">Registrá los datos que te resulten útiles. El peso es opcional: los hábitos, la energía y la constancia también importan.</p>
 <label>🥗 ¿Qué comiste hoy?</label><input id="comidaDia" maxlength="300" placeholder="Anotá tus comidas"><label>💧 Vasos de agua</label><input id="aguaDia" type="number" min="0" max="50" placeholder="Ej. 6"><label>🚶 Minutos de movimiento</label><input id="movimientoDia" type="number" min="0" max="1440" placeholder="Ej. 20"><label>Peso en kg (opcional)</label><input id="peso" type="number" min="1" max="500" step="0.1" placeholder="Ej. 80,5">
 <label>Nota del día</label><input id="nota" maxlength="180" placeholder="Ej. Caminé y dormí mejor">
 <button class="primary" id="registrar">Guardar registro de hoy</button>
 </div>
-<div class="card"><h2>🗓️ Historial</h2><div id="historial"><p class="muted">Todavía no hay registros.</p></div><button class="primary" id="borrar" style="background:#7b4747">Borrar historial</button></div>
+<div class="card"><h2>Tu historial</h2><div id="historial"><p class="muted">Todavía no hay registros.</p></div><button class="primary" id="borrar" style="background:#7b4747">Borrar historial</button></div>
 </section>
 
 <section id="semana" class="hidden">
 <div class="card">
-<h2>📅 Tu plan semanal</h2>
+<h2>Tu semana de bienestar</h2>
 <p>Una guía flexible y económica. Cambiá comidas según tus gustos, hambre y lo que tengas en casa.</p>
 <p id="avisoPlan" class="pill">Hábitos sostenibles</p>
 <p class="muted">Las cantidades dependen de tus necesidades; no hace falta pasar hambre ni seguir el menú a rajatabla.</p>
@@ -203,18 +204,18 @@ button.secondary{background:#fff;color:#176b4d;border:1px solid #176b4d;border-r
 <div class="meal"><h3>🍳 Cena</h3>Reutilizá sobras de forma segura o prepará una tortilla con verduras.</div>
 <p>🏃 Movimiento: descanso o paseo suave.</p></div>
 <div class="card">
-<h2>🛒 Organización de la semana</h2>
+<h2>Organización inteligente</h2>
 <p>Revisá qué tenés en casa, elegí frutas y verduras de estación, cociná legumbres para varias comidas y guardá las sobras de forma segura. Para la opción vegetariana, usá lentejas, porotos, garbanzos, huevos o lácteos según tus preferencias.</p>
 <button class="primary" onclick="document.querySelector('[data-tab=progreso]').click()">📈 Registrar mi progreso</button>
 </div>
-<div class="card"><h2>💚 Recordatorio</h2>
+<div class="card"><h2>A tener en cuenta</h2>
 <p>Este menú es una idea general, no una dieta clínica ni una garantía de pérdida de peso. Si tenés una condición médica, alergias o necesidades nutricionales especiales, consultá a un profesional.</p></div>
 </section>
 
 
 <section id="personalizado" class="hidden">
 <div class="card">
-<h2>🎯 Tu plan personalizado</h2>
+<h2>Tu plan personalizado</h2>
 <p>Contanos tus preferencias para recibir ideas prácticas de alimentación y movimiento.</p>
 <label>Tu objetivo</label>
 <select id="ppObjetivo">
