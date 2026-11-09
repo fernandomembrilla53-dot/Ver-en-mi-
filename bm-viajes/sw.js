@@ -1,7 +1,7 @@
 /* BM Viajes: la app se puede abrir sin conexión; los mapas requieren Internet.
    Nunca guarda en caché ubicaciones GPS ni datos del servidor. */
-const CACHE="bm-viajes-shell-2026-11-09-v2";
-const SHELL=["./","./index.html","./manifest.webmanifest","./icon.svg","./enhancements.js"];
+const CACHE="bm-viajes-shell-2026-11-09-v3";
+const SHELL=["./","./index.html","./manifest.webmanifest","./icon.svg","./icon-192.png","./icon-512.png","./enhancements.js"];
 self.addEventListener("install",event=>{
  event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL)).then(()=>self.skipWaiting()));
 });
