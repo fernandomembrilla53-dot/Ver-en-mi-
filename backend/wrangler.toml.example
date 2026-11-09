@@ -3,7 +3,7 @@ main = "worker.js"
 compatibility_date = "2026-10-01"
 [vars]
 # Sustituir por el origen REAL de la aplicación, sin barra final, y mantener solo ese origen.
-APP_ORIGIN = "https://TU-APP.pages.dev"
+APP_ORIGIN = "https://fernandomembrilla53-dot.github.io"
 [[d1_databases]]
 binding = "DB"
 database_name = "ver-en-mi-tienda"
