@@ -16,23 +16,8 @@ panel.append(intro,content,cartBox);
 const first=section.querySelector(".card");if(first)first.after(panel);else section.prepend(panel);
 let products=[],cart=new Map();
 const status=(message,isError=false)=>{content.innerHTML='<p class="'+(isError?'shop-error':'muted')+'">'+esc(message)+'</p>';cartBox.hidden=true;};
-if(!API){
-  const note=document.createElement("p");note.className="muted";note.textContent="Las fotos ya están cargadas. Yami agregará los nombres, ingredientes y precios actuales. Todavía no se reciben pedidos desde esta sección.";
-  content.append(note);
-  const grid=document.createElement("div");grid.className="shop-grid";
-  for(let i=0;i<16;i++){
-    const item=document.createElement("article");item.className="shop-product";
-    const photo=document.createElement("div");photo.className="shop-photo";photo.style.backgroundImage='url("./assets/catalogo-yami-16.svg")';
-    photo.style.backgroundSize="400% 400%";photo.style.backgroundPosition=((i%4)*100/3)+"% "+(Math.floor(i/4)*100/3)+"%";
-    photo.setAttribute("role","img");photo.setAttribute("aria-label","Foto real de un producto de Yami, sin identificar");
-    const desc=document.createElement("div");desc.className="shop-detail";
-    const name=document.createElement("strong");name.textContent="Producto por identificar · foto "+String(i+1).padStart(2,"0");
-    const detail=document.createElement("small");detail.textContent="Nombre y precio pendientes de Yami";
-    desc.append(name,detail);item.append(photo,desc);grid.append(item);
-  }
-  content.append(grid);cartBox.hidden=true;return;
-}
-const api=(path,opts={})=>fetch(API+path,{...opts,headers:{"Content-Type":"application/json",...(opts.headers||{})}}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||"No se pudo conectar");return d});
+if(!API){status("El catálogo se está preparando. Todavía no hay productos ni precios publicados.");return;}
+const api=(path,opts={})=>fetch(API+path,{cache:"no-store",...opts,headers:{"Content-Type":"application/json",...(opts.headers||{})}}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||"No se pudo conectar");return d});
 const compare=(a,b)=>Number(b.featured)-Number(a.featured)||(a.category==="Ensaladas"?-1:b.category==="Ensaladas"?1:0)||a.name.localeCompare(b.name,"es");
 function draw(){
  content.replaceChildren();const list=document.createElement("div");list.className="shop-grid";
@@ -41,10 +26,9 @@ function draw(){
  const title=document.createElement("h3");title.textContent="Ensaladas y especialidades disponibles";content.append(title);
  sorted.forEach(p=>{
   const item=document.createElement("article");item.className="shop-product";
-  const hasAtlas=Number.isInteger(p.photo_index)&&p.photo_index>=0&&p.photo_index<16;
   const img=p.photo_url?document.createElement("img"):document.createElement("div");
   if(p.photo_url){img.src=p.photo_url;img.alt=p.name;img.loading="lazy";img.className="shop-photo";img.onerror=()=>{img.removeAttribute("src");img.alt="Foto pendiente";};}
-  else if(hasAtlas){img.className="shop-photo";img.style.backgroundImage='url("./assets/catalogo-yami-16.svg")';img.style.backgroundSize="400% 400%";img.style.backgroundPosition=((p.photo_index%4)*100/3)+"% "+(Math.floor(p.photo_index/4)*100/3)+"%";img.setAttribute("role","img");img.setAttribute("aria-label","Foto de "+p.name);}else{img.className="shop-no-photo";img.textContent="Foto próximamente";}
+  else{img.className="shop-no-photo";img.textContent="Foto próximamente";}
   const detail=document.createElement("div");detail.className="shop-detail";
   detail.innerHTML=(p.featured?'<div class="shop-featured">MENÚ DEL DÍA</div>':'')+'<small>'+esc(p.category)+'</small><h3>'+esc(p.name)+'</h3><small>'+esc(p.description||"")+'</small><div class="shop-price">'+money(p.price_ars)+'</div>';
   const button=document.createElement("button");button.type="button";button.textContent="Agregar al pedido";button.onclick=()=>{cart.set(p.id,Math.min(20,(cart.get(p.id)||0)+1));drawCart()};
@@ -67,12 +51,12 @@ function drawCart(){
  const form=document.createElement("form");form.innerHTML='<label>Nombre <input name="nombre" required maxlength="100" autocomplete="name"></label><label>Teléfono <input name="telefono" required maxlength="30" type="tel" autocomplete="tel"></label><label>Entrega <select name="entrega"><option value="retiro">Retiro a coordinar</option><option value="envio">Envío a coordinar</option></select></label><label>Dirección (solo si pedís envío) <input name="direccion" maxlength="180"></label><label>Indicaciones (opcional) <textarea name="notas" maxlength="300" rows="2"></textarea></label><button type="submit">Enviar pedido a Yami</button><p class="muted">La compra queda solicitada. Yami confirmará disponibilidad, entrega y pago.</p>';
  const msg=document.createElement("p");msg.setAttribute("role","status");form.append(msg);
  form.onsubmit=async e=>{e.preventDefault();const fd=new FormData(form),button=form.querySelector("button[type=submit]");button.disabled=true;msg.textContent="Enviando…";
- try{const payload={name:fd.get("nombre"),phone:fd.get("telefono"),delivery:fd.get("entrega"),address:fd.get("direccion"),notes:fd.get("notas"),items:[...cart].map(([id,quantity])=>({id,quantity}))};
+ try{const payload={name:fd.get("nombre"),phone:fd.get("telefono"),delivery:fd.get("entrega"),address:fd.get("direccion"),notes:fd.get("notas"),quoted_total_ars:total,items:[...cart].map(([id,quantity])=>({id,quantity}))};
  const result=await api("/api/orders",{method:"POST",body:JSON.stringify(payload)});
  cart.clear();drawCart();const ok=document.createElement("p");ok.className="shop-success";ok.setAttribute("role","status");ok.textContent="Pedido #"+result.order_id+" registrado. Yami lo confirmará.";cartBox.append(ok);
  }catch(err){msg.className="shop-error";msg.textContent=err.message;button.disabled=false;}};
  cartBox.append(form);
 }
 async function reload(){try{const data=await api("/api/menu");products=Array.isArray(data.products)?data.products.filter(p=>Number.isSafeInteger(p.price_ars)&&p.price_ars>=0):[];draw()}catch(e){status("No se pudo cargar la tienda. Probá de nuevo cuando tengas conexión.",true);}}
-reload();document.addEventListener("visibilitychange",()=>{if(!document.hidden)reload()});
+reload();document.addEventListener("visibilitychange",()=>{if(!document.hidden)reload()});window.addEventListener("focus",reload);setInterval(()=>{if(!document.hidden)reload()},120000);
 })();

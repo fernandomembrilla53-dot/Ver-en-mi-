@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS products (
  price_ars INTEGER,
  photo_index INTEGER UNIQUE,
  photo_url TEXT,
+ photo_key TEXT,
  active INTEGER NOT NULL DEFAULT 0,
  available INTEGER NOT NULL DEFAULT 1,
  featured INTEGER NOT NULL DEFAULT 0,
