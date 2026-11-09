@@ -4,6 +4,9 @@ on:
     paths:
       - 'backend/**'
       - 'store.js'
+      - 'store-config.js'
+      - 'index.html'
+      - 'sw.js'
       - 'store.css'
       - 'privacidad.html'
       - '.github/workflows/verificar-tienda-yami.yml'
@@ -34,4 +37,30 @@ jobs:
           columns={r[1] for r in db.execute("PRAGMA table_info(products)")}
           assert {'photo_key','photo_url','price_ars','active','available','featured'} <= columns
           print('D1 schema compatible con SQLite: OK')
+          PY
+
+      - name: Verificar integración pública y sincronización del Worker
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          index = Path("index.html").read_text()
+          cfg = Path("store-config.js").read_text()
+          frontend = Path("store.js").read_text()
+          sw = Path("sw.js").read_text()
+          admin = Path("backend/admin-page.js").read_text()
+          worker = Path("backend/worker.js").read_text()
+          single = Path("backend/worker-single.js").read_text()
+          assert '<script src="./store-config.js"></script>' in index
+          assert '<script defer src="./store.js"></script>' in index
+          assert index.index("store-config.js") < index.index("store.js")
+          assert '<link rel="stylesheet" href="./store.css">' in index
+          assert 'ver-en-mi-tienda.fernandomembrilla53.workers.dev' in cfg
+          assert "panel.hidden=true" in frontend
+          assert 'p.photo_url' in frontend and 'p.price_ars>0' in frontend
+          for path in ["./store.css", "./store-config.js", "./store.js"]:
+              assert path in sw, path
+          expected = admin.replace("export const adminPage", "const adminPage", 1)
+          expected += "\n" + worker.replace('import { adminPage } from "./admin-page.js";\n', "", 1)
+          assert expected == single, "El Worker listo para Cloudflare no coincide con su código fuente"
+          print("Tienda enlazada, catálogo protegido y Worker sincronizado: OK")
           PY
