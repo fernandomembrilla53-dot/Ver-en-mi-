@@ -99,7 +99,7 @@ export default {async fetch(req,env){
    if(path==="/api/admin/products"&&method==="POST"){
     const p=await parseBody(req),id=crypto.randomUUID(),name=bounded(p?.name,100),desc=bounded(p?.description,400),category=bounded(p?.category,45)||"Otros";
     const price=p?.price_ars==null||p.price_ars===""?null:Number(p.price_ars),active=Boolean(p?.active),available=Boolean(p?.available);
-    if(price!==null&&(!Number.isSafeInteger(price)||price<1||price>10000000)||active&&(!name||price===null))return error("Nombre y precio actual son obligatorios para publicar.");
+    if(price!==null&&(!Number.isSafeInteger(price)||price<1||price>10000000)||active)return error("Primero guardá el borrador, subí la foto y luego publicá.");
     const when=Boolean(p?.featured)?tzToday():"";const now=new Date().toISOString();
     await env.DB.prepare("INSERT INTO products(id,name,description,category,price_ars,photo_index,photo_url,active,available,featured,menu_date,created_at,updated_at) VALUES (?,?,?,?,?,NULL,NULL,?,?,?,?,?,?)").bind(id,name,desc,category,price,Number(active),Number(available),Number(Boolean(p?.featured)),when,now,now).run();
     return json({ok:true,id},201);
@@ -110,9 +110,9 @@ export default {async fetch(req,env){
     const id=uploadMatch[1],current=await env.DB.prepare("SELECT id,photo_key FROM products WHERE id=?").bind(id).first();
     if(!current)return error("Producto no encontrado",404);
     const size=Number(req.headers.get("content-length")||0);
-    if(size>9*1024*1024)return error("La foto supera el tamaño máximo",413);
+    if(size>14*1024*1024)return error("La foto supera el tamaño máximo",413);
     const form=await req.formData(),file=form.get("photo");
-    if(!(file instanceof File)||file.size<100||file.size>6*1024*1024)return error("Elegí una foto de menos de 6 MB");
+    if(!(file instanceof File)||file.size<100||file.size>12*1024*1024)return error("Elegí una foto de menos de 12 MB");
     const mime={"image/jpeg":"jpg","image/png":"png","image/webp":"webp"};
     const ext=mime[file.type];if(!ext)return error("Solo se admiten fotos JPG, PNG o WebP");
     const b=new Uint8Array(await file.slice(0,12).arrayBuffer());
@@ -132,10 +132,10 @@ export default {async fetch(req,env){
    }
    const match=/^\/api\/admin\/products\/([\w-]+)$/.exec(path);
    if(match&&method==="PUT"){
-    const current=await env.DB.prepare("SELECT id FROM products WHERE id=?").bind(match[1]).first();if(!current)return error("Producto inexistente",404);
+    const current=await env.DB.prepare("SELECT id,photo_key FROM products WHERE id=?").bind(match[1]).first();if(!current)return error("Producto inexistente",404);
     const p=await parseBody(req),name=bounded(p?.name,100),desc=bounded(p?.description,400),category=bounded(p?.category,45)||"Otros";
     const price=p?.price_ars==null||p.price_ars===""?null:Number(p.price_ars),active=Boolean(p?.active),available=Boolean(p?.available);
-    if(price!==null&&(!Number.isSafeInteger(price)||price<1||price>10000000)||active&&(!name||price===null))return error("Completá nombre y precio antes de publicar.");
+    if(price!==null&&(!Number.isSafeInteger(price)||price<1||price>10000000)||active&&(!name||price===null||!current.photo_key))return error("Para publicar necesitás nombre, foto original y precio actual.");
     const when=Boolean(p?.featured)?tzToday():"";
     await env.DB.prepare("UPDATE products SET name=?,description=?,category=?,price_ars=?,active=?,available=?,featured=?,menu_date=?,updated_at=? WHERE id=?").bind(name,desc,category,price,Number(active),Number(available),Number(Boolean(p?.featured)),when,new Date().toISOString(),match[1]).run();
     return json({ok:true});
