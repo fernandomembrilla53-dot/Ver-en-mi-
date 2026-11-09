@@ -72,6 +72,7 @@ export default {async fetch(req,env){
     const subtotal=p.price_ars*it.quantity;total+=subtotal;if(total>100000000)return badPublic(req,env,"El pedido excede el límite.");
     lines.push({id:p.id,name:p.name,qty:it.quantity,price:p.price_ars,subtotal});
    }
+   if(!Number.isSafeInteger(input.quoted_total_ars)||input.quoted_total_ars!==total)return badPublic(req,env,"Cambió el precio de algún producto. Revisá el carrito antes de confirmar.",409);
    const order={id:crypto.randomUUID(),name,phone,delivery,address,notes,total_ars:total};
    await env.DB.batch([
     env.DB.prepare("INSERT INTO orders(id,name,phone,delivery,address,notes,total_ars,status,created_at) VALUES (?,?,?,?,?,?,?,'pendiente',?)").bind(order.id,name,phone,delivery,address,notes,total,new Date().toISOString()),
