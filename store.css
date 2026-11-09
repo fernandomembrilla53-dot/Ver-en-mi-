@@ -25,14 +25,13 @@
 .vem-shop-teaser button{margin:0 0 .8rem}
 .vem-shop-teaser small{display:block;max-width:47ch;color:#486354}
 
-/* Galería de fotografías de productos. La imagen contiene una cuadrícula 4x4.
-   Los mosaicos conservan el encuadre entero dentro de cada celda. */
+/* Galería de fotografías individuales sin recortes ni precios ficticios. */
 .shop-photo-preview{padding:1rem 0 1.25rem}
 .shop-photo-preview-head h3{margin:0 0 .25rem;font-size:1.2rem}
 .shop-photo-preview-head p{font-size:.87rem;color:var(--muted,#65796a);margin:0 0 .85rem;line-height:1.45}
 .shop-preview-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem}
 @media(min-width:650px){.shop-preview-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
 .shop-preview-tile{overflow:hidden;margin:0;padding:.38rem;border:1px solid #d8e7da;border-radius:14px;background:#f8faf7;box-shadow:0 2px 8px #214f3520}
-.shop-preview-image{aspect-ratio:1 / 1;width:100%;border-radius:10px;background-image:url("./assets/productos-vista-previa.jpg");background-repeat:no-repeat;background-size:400% 400%;background-color:#eef2ef}
+.shop-preview-image{display:block;aspect-ratio:1 / 1;width:100%;height:auto;object-fit:contain;border-radius:10px;background-color:#eef2ef}
 .shop-preview-tile figcaption{text-align:center;font-size:.7rem;color:#597265;margin:.45rem 0 .16rem}
 .shop-photo-preview[hidden]{display:none!important}
