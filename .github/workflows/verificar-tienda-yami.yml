@@ -99,6 +99,15 @@ jobs:
           assert.equal(badOrder.status,400);
           console.log('Worker: panel privado, catálogo vacío, CORS, seguridad básica y pedido inválido: OK');
           JS
+      - name: Comprobar si el repositorio ya permite desplegar Cloudflare
+        env:
+          CF_DEPLOY_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -n "$CF_DEPLOY_TOKEN" ]; then
+            echo "Cloudflare: credencial de despliegue disponible en este repositorio"
+          else
+            echo "Cloudflare: no hay token de despliegue en este repositorio"
+          fi
       - name: Comprobar endpoints públicos del Worker (diagnóstico sin modificar)
         continue-on-error: true
         run: |
