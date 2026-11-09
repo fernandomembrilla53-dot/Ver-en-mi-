@@ -1,0 +1,17 @@
+name = "bm-viajes-api"
+main = "worker.mjs"
+compatibility_date = "2026-11-09"
+
+# Public vars: no secretos, sin activacion de viajes por defecto.
+[vars]
+FRONTEND_ORIGIN = "https://fernandomembrilla53-dot.github.io"
+ENABLE_LIVE_RIDES = "false"
+MAIL_FROM = "cambiar@dominio-verificado.example"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "bm-viajes-db"
+database_id = "REEMPLAZAR_ID_D1"
+
+[triggers]
+crons = ["*/10 * * * *"]
