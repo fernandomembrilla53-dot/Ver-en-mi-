@@ -65,6 +65,40 @@ jobs:
           print("Tienda enlazada, catálogo protegido y Worker sincronizado: OK")
           PY
 
+      - name: Probar rutas de Worker en memoria
+        run: |
+          node --input-type=module <<'JS'
+          import worker from './backend/worker-single.js';
+          import assert from 'node:assert/strict';
+          const db = {
+            batch: async statements => statements.map(() => ({success:true})),
+            prepare(sql) {
+              return {
+                bind(...values){return this},
+                all: async () => ({results:[]}),
+                first: async () => null,
+                run: async () => ({success:true}),
+              };
+            },
+          };
+          const env={DB:db,APP_ORIGIN:'https://fernandomembrilla53-dot.github.io'};
+          const base='https://ver-en-mi-tienda.fernandomembrilla53.workers.dev';
+          const admin=await worker.fetch(new Request(base+'/admin'),env);
+          assert.equal(admin.status,200);
+          assert.match(await admin.text(),/Tienda de Yami/);
+          const menu=await worker.fetch(new Request(base+'/api/menu',{headers:{Origin:env.APP_ORIGIN}}),env);
+          assert.equal(menu.status,200);
+          assert.equal(menu.headers.get('Access-Control-Allow-Origin'),env.APP_ORIGIN);
+          assert.deepEqual((await menu.json()).products,[]);
+          const denied=await worker.fetch(new Request(base+'/api/admin/products'),env);
+          assert.equal(denied.status,401);
+          const badOrder=await worker.fetch(new Request(base+'/api/orders',{
+            method:'POST',headers:{Origin:env.APP_ORIGIN,'Content-Type':'application/json'},
+            body:JSON.stringify({name:'Ana',phone:'2494000000',delivery:'retiro',items:[]})
+          }),env);
+          assert.equal(badOrder.status,400);
+          console.log('Worker: panel privado, catálogo vacío, CORS, seguridad básica y pedido inválido: OK');
+          JS
       - name: Comprobar endpoints públicos del Worker (diagnóstico sin modificar)
         continue-on-error: true
         run: |
