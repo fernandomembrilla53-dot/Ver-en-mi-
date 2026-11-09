@@ -1,0 +1,12 @@
+name = "ver-en-mi-tienda"
+main = "worker.js"
+compatibility_date = "2026-10-01"
+[vars]
+# Sustituir por el origen REAL de la aplicación, sin barra final, y mantener solo ese origen.
+APP_ORIGIN = "https://TU-APP.pages.dev"
+[[d1_databases]]
+binding = "DB"
+database_name = "ver-en-mi-tienda"
+database_id = "REEMPLAZAR_POR_ID_DE_D1"
+# Secrets no deben aparecer en este archivo: ADMIN_PASSWORD, SESSION_SECRET
+# Opcionales para correo: BREVO_API_KEY, ORDER_NOTIFY_EMAIL, NOTIFY_SENDER_EMAIL
