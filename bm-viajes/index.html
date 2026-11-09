@@ -11,7 +11,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<meta name="description" content="BM Viajes: prototipo interactivo de movilidad para Ayacucho. Vista previa con viajes y pagos simulados.">
+<meta name="description" content="BM Viajes: PWA para explorar movilidad en Ayacucho con mapa y GPS opcional. Viajes y pagos simulados.">
 <title>BM Viajes | Vista previa interactiva</title>
 <style>
 :root{--ink:#102031;--ink2:#1a3043;--gold:#ffca67;--amber:#f1aa37;--mint:#b8efda;--white:#fff;--sub:#a7b7c6;--line:rgba(255,255,255,.13);--paper:#f4f6f8;--shadow:0 24px 55px rgba(12,24,38,.15);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
@@ -48,6 +48,7 @@
 .leaflet-control-attribution{font-size:9px!important}
 .bm-disclaimer{padding:13px 16px;border:1px solid #f3dfaa;border-radius:12px;background:#fff8e8;color:#6b5730;font-size:12px;line-height:1.6;margin:0 0 15px}
 @media(max-width:600px){.bm-toolbox{padding:14px;border-radius:0 12px 12px 12px}.bm-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.bm-controls button{padding:10px 6px;font-size:11px}.map-panel .map-top{left:9px;right:9px;top:9px}.map-top .location{font-size:10px;padding:7px}.map-top .map-label{font-size:9px;padding:7px}}
+.bm-pilot-link{display:inline-flex;align-items:center;padding:10px 13px;background:#fff5df;color:#694912;border:1px solid #edc67b;border-radius:10px;font-size:12px;font-weight:900;text-decoration:none}.bm-pilot-link:hover{background:#ffe6af}
 </style>
 </head>
 <body>
@@ -87,6 +88,7 @@
     <button type="button" id="share-trip">Compartir esta demo</button>
     <button type="button" id="save-favorite">Guardar recorrido</button>
     <button type="button" id="load-favorite">Cargar favorito</button>
+    <a href="./piloto.html" class="bm-pilot-link">Ver panel del piloto conectado</a>
   </div></details>
 </section>
 <p class="bm-disclaimer"><strong>Versión de prueba:</strong> el mapa y el GPS pueden ser reales, pero todavía no se asignan conductores, no hay seguimiento entre celulares ni pagos o viajes reales. No uses esta demo para solicitar transporte o emergencias.</p>
@@ -106,7 +108,7 @@
               <button class="svc" data-type="xl" type="button" aria-pressed="false"><span class="emoji">🚐</span><b>BM XL</b><small>Grupo o equipaje</small></button>
             </div></div>
             <div class="farebox">
-              <div class="split"><span>Distancia estimada (simulada)</span><strong id="km">3,2 km</strong></div>
+              <div class="split"><span>Distancia ilustrativa (no ruta vial)</span><strong id="km">3,2 km</strong></div>
               <div class="split"><span>Tiempo estimado (simulado)</span><strong id="eta">8 min</strong></div>
               <div class="split total"><span>Tarifa ilustrativa</span><strong id="price">$ 3.760</strong></div>
             </div>
@@ -161,7 +163,7 @@
       </aside>
     </div>
   </main>
-  <footer class="footer"><span>© BM-Apps · BM Viajes</span><span>Prototipo conceptual · Sin viajes ni pagos reales · Español (Argentina)</span></footer>
+  <footer class="footer"><span>© BM-Apps · BM Viajes</span><span>Prototipo conceptual · Sin viajes ni pagos reales · Español (Argentina) · <a href="./privacidad.html">Privacidad</a></span></footer>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script>
