@@ -1,5 +1,5 @@
 # Ver en Mí — Tienda de Yami
-Estado: servidor preparado en GitHub y base D1 ya creada en Cloudflare. La tienda permanece deshabilitada en la app pública hasta verificar el pedido y acceso de Yami.
+Estado: servidor preparado en GitHub y base D1 ya creada en Cloudflare. El frontend está enlazado al Worker existente, pero la sección de tienda permanece invisible para clientes mientras no haya productos publicados con foto, nombre y precio verificados. El backend todavía requiere despliegue y pruebas reales.
 
 ## Arquitectura sin pago ni R2
 - Cloudflare Worker: `ver-en-mi-tienda`
@@ -10,7 +10,7 @@ Estado: servidor preparado en GitHub y base D1 ya creada en Cloudflare. La tiend
 - `worker-single.js` es el archivo para editor web del dashboard; `worker.js` y `admin-page.js` son fuentes.
 - Se necesitan secretos de Worker `ADMIN_PASSWORD` (12+ caracteres) y `SESSION_SECRET` (32+); nunca en GitHub.
 - Correo opcional: `BREVO_API_KEY`, `ORDER_NOTIFY_EMAIL`, `NOTIFY_SENDER_EMAIL`. Sin estos secretos los pedidos se ven en el panel, pero NO hay alerta por correo con la app cerrada.
-- Para habilitar el frontend después de pruebas: configurar `store-config.js` con la URL real del Worker y restaurar inclusiones `store.css`, `store-config.js`, `store.js` en `index.html`. No hacer esto antes de pruebas.
+- Frontend vinculado a `https://ver-en-mi-tienda.fernandomembrilla53.workers.dev`, con `store.css`, `store-config.js` y `store.js` añadidos a la PWA y precaché actualizado. Si la API está caída o no hay productos completos, **no se muestra ninguna tarjeta** ni precios antiguos.
 - Los nombres y precios los establece Yami desde `/admin`; no crear productos con precios viejos ni inventados.
 - Categorías principales Ensaladas, Ensaladas de frutas, Verduras picadas y preparadas, Comidas elaboradas (arrollados de acelga, zanahoria y papa por separado) y Jugos. Congelados no se ofrece.
 - Carrito calculado en el servidor, pedido rechazado si cambia precio desde que el cliente hizo carrito.
