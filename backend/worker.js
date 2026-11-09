@@ -39,7 +39,7 @@ export default {async fetch(req,env){
  if(!env.DB)return error("Base de datos sin configurar",503);
  if(method==="OPTIONS"&&path.startsWith("/api/")&&allowedOrigin(req,env))return new Response(null,{status:204,headers:cors(req,env)});
  if(path==="/admin"&&method==="GET")return new Response(adminPage,{headers:{"content-type":"text/html;charset=utf-8","cache-control":"no-store","X-Frame-Options":"DENY","Referrer-Policy":"no-referrer","X-Content-Type-Options":"nosniff"}});
- if(path==="/api/atlas"&&method==="GET"&&env.APP_ORIGIN)return Response.redirect(env.APP_ORIGIN+"/assets/catalogo-yami-16.jpg",302);
+ if(path==="/api/atlas"&&method==="GET"&&env.APP_ORIGIN)return Response.redirect(env.APP_ORIGIN+"/assets/catalogo-yami-16.svg",302);
  try{
   if(path==="/api/menu"&&method==="GET"){
    const q=await env.DB.prepare("SELECT * FROM products WHERE active=1 AND available=1 AND name <> '' AND price_ars IS NOT NULL AND price_ars > 0 ORDER BY CASE WHEN featured=1 AND menu_date=? THEN 0 ELSE 1 END, CASE WHEN category='Ensaladas' THEN 0 ELSE 1 END, updated_at DESC LIMIT 200").bind(tzToday()).all();
