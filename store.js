@@ -7,7 +7,7 @@ const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&
 const section=document.getElementById("comidas");
 if(!section)return;
 const panel=document.createElement("div");
-panel.id="vemTienda";panel.className="vem-shop";panel.hidden=true;
+panel.id="vemTienda";panel.className="vem-shop";panel.hidden=false;
 const intro=document.createElement("div");
 intro.innerHTML='<div class="shop-featured">VER EN MÍ · LO SIMPLE DE COMER BIEN</div><h2>Las comidas de Yami</h2><p class="muted">Ensaladas frescas y otras preparaciones del día. Precios y disponibilidad actualizados por Yami.</p>';
 const content=document.createElement("div");
@@ -22,7 +22,7 @@ const compare=(a,b)=>Number(b.featured)-Number(a.featured)||(a.category==="Ensal
 function draw(){
  content.replaceChildren();const list=document.createElement("div");list.className="shop-grid";
  const sorted=[...products].sort(compare);
- if(!sorted.length){panel.hidden=true;status("Hoy no hay productos publicados. Volvé a consultar más tarde.");return;}
+ if(!sorted.length){panel.hidden=false;status("Las fotos, los nombres y los precios de Yami todavía están en preparación. Esta sección se actualizará automáticamente cuando Yami publique los productos.");return;}
  panel.hidden=false;
  const title=document.createElement("h3");title.textContent="Ensaladas y especialidades disponibles";content.append(title);
  sorted.forEach(p=>{
@@ -58,6 +58,7 @@ function drawCart(){
  }catch(err){msg.className="shop-error";msg.textContent=err.message;button.disabled=false;}};
  cartBox.append(form);
 }
-async function reload(){try{const data=await api("/api/menu");products=Array.isArray(data.products)?data.products.filter(p=>typeof p.id==="string"&&typeof p.name==="string"&&p.name.trim()&&typeof p.photo_url==="string"&&p.photo_url&&Number.isSafeInteger(p.price_ars)&&p.price_ars>0):[];draw()}catch(e){panel.hidden=true;status("No se pudo cargar la tienda. Probá de nuevo cuando tengas conexión.",true);}}
-reload();document.addEventListener("visibilitychange",()=>{if(!document.hidden)reload()});window.addEventListener("focus",reload);setInterval(()=>{if(!document.hidden)reload()},120000);
+async function reload(){try{const data=await api("/api/menu");products=Array.isArray(data.products)?data.products.filter(p=>typeof p.id==="string"&&typeof p.name==="string"&&p.name.trim()&&typeof p.photo_url==="string"&&p.photo_url&&Number.isSafeInteger(p.price_ars)&&p.price_ars>0):[];draw()}catch(e){panel.hidden=false;status("La tienda no pudo conectarse por ahora. El resto de Ver en Mi sigue disponible.",true);}}
+document.getElementById("yamiVerTienda")?.addEventListener("click",()=>{document.querySelector('nav [data-tab="comidas"]')?.click();});
+reload();window.addEventListener("online",reload);document.addEventListener("visibilitychange",()=>{if(!document.hidden)reload()});window.addEventListener("focus",reload);setInterval(()=>{if(!document.hidden)reload()},120000);
 })();
