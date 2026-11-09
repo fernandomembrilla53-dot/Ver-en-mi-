@@ -4,6 +4,9 @@ on:
     paths:
       - 'backend/**'
       - 'store.js'
+      - 'store-config.js'
+      - 'index.html'
+      - 'sw.js'
       - 'store.css'
       - 'privacidad.html'
       - '.github/workflows/verificar-tienda-yami.yml'
@@ -34,4 +37,103 @@ jobs:
           columns={r[1] for r in db.execute("PRAGMA table_info(products)")}
           assert {'photo_key','photo_url','price_ars','active','available','featured'} <= columns
           print('D1 schema compatible con SQLite: OK')
+          PY
+
+      - name: Verificar integración pública y sincronización del Worker
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          index = Path("index.html").read_text()
+          cfg = Path("store-config.js").read_text()
+          frontend = Path("store.js").read_text()
+          sw = Path("sw.js").read_text()
+          admin = Path("backend/admin-page.js").read_text()
+          worker = Path("backend/worker.js").read_text()
+          single = Path("backend/worker-single.js").read_text()
+          assert '<script src="./store-config.js"></script>' in index
+          assert '<script defer src="./store.js"></script>' in index
+          assert index.index("store-config.js") < index.index("store.js")
+          assert '<link rel="stylesheet" href="./store.css">' in index
+          assert 'ver-en-mi-tienda.fernandomembrilla53.workers.dev' in cfg
+          assert "panel.hidden=true" in frontend
+          assert 'p.photo_url' in frontend and 'p.price_ars>0' in frontend
+          for path in ["./store.css", "./store-config.js", "./store.js"]:
+              assert path in sw, path
+          expected = admin.replace("export const adminPage", "const adminPage", 1)
+          expected += "\n" + worker.replace('import { adminPage } from "./admin-page.js";\n', "", 1)
+          assert expected == single, "El Worker listo para Cloudflare no coincide con su código fuente"
+          print("Tienda enlazada, catálogo protegido y Worker sincronizado: OK")
+          PY
+
+      - name: Probar rutas de Worker en memoria
+        run: |
+          node --input-type=module <<'JS'
+          import worker from './backend/worker-single.js';
+          import assert from 'node:assert/strict';
+          const db = {
+            batch: async statements => statements.map(() => ({success:true})),
+            prepare(sql) {
+              return {
+                bind(...values){return this},
+                all: async () => ({results:[]}),
+                first: async () => null,
+                run: async () => ({success:true}),
+              };
+            },
+          };
+          const env={DB:db,APP_ORIGIN:'https://fernandomembrilla53-dot.github.io'};
+          const base='https://ver-en-mi-tienda.fernandomembrilla53.workers.dev';
+          const admin=await worker.fetch(new Request(base+'/admin'),env);
+          assert.equal(admin.status,200);
+          assert.match(await admin.text(),/Tienda de Yami/);
+          const menu=await worker.fetch(new Request(base+'/api/menu',{headers:{Origin:env.APP_ORIGIN}}),env);
+          assert.equal(menu.status,200);
+          assert.equal(menu.headers.get('Access-Control-Allow-Origin'),env.APP_ORIGIN);
+          assert.deepEqual((await menu.json()).products,[]);
+          const denied=await worker.fetch(new Request(base+'/api/admin/products'),env);
+          assert.equal(denied.status,401);
+          const badOrder=await worker.fetch(new Request(base+'/api/orders',{
+            method:'POST',headers:{Origin:env.APP_ORIGIN,'Content-Type':'application/json'},
+            body:JSON.stringify({name:'Ana',phone:'2494000000',delivery:'retiro',items:[]})
+          }),env);
+          assert.equal(badOrder.status,400);
+          console.log('Worker: panel privado, catálogo vacío, CORS, seguridad básica y pedido inválido: OK');
+          JS
+      - name: Comprobar si el repositorio ya permite desplegar Cloudflare
+        env:
+          CF_DEPLOY_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -n "$CF_DEPLOY_TOKEN" ]; then
+            echo "Cloudflare: credencial de despliegue disponible en este repositorio"
+          else
+            echo "Cloudflare: no hay token de despliegue en este repositorio"
+          fi
+      - name: Comprobar endpoints públicos del Worker (diagnóstico sin modificar)
+        continue-on-error: true
+        run: |
+          python3 - <<'PY'
+          from urllib.request import Request, urlopen
+          from urllib.error import HTTPError, URLError
+          from urllib.parse import urlparse
+          import json
+          base = "https://ver-en-mi-tienda.fernandomembrilla53.workers.dev"
+          origin = "https://fernandomembrilla53-dot.github.io"
+          for path in ["/admin", "/api/menu"]:
+              url = base + path
+              request = Request(url, headers={"Origin":origin,"User-Agent":"BM-Apps-SafeSmokeTest/1.0"})
+              try:
+                  with urlopen(request, timeout=12) as response:
+                      status,body = response.status,response.read(200000)
+                      cors = response.headers.get("Access-Control-Allow-Origin")
+                      print(f"{path}: HTTP {status}; bytes={len(body)}; CORS={cors!r}")
+                      if path == "/admin":
+                          assert b"Tienda de Yami" in body or b"Panel de Yami" in body, "Panel administrativo ausente"
+                      if path == "/api/menu":
+                          obj = json.loads(body)
+                          assert isinstance(obj.get("products"),list)
+                          assert cors == origin, "Falta CORS para la app"
+                          print("Productos activos visibles:",len(obj["products"]))
+              except (HTTPError, URLError, AssertionError, ValueError) as exc:
+                  print(path, "no verificado:", type(exc).__name__, str(exc)[:160])
+                  raise
           PY
