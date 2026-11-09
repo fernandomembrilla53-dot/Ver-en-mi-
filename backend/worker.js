@@ -122,7 +122,7 @@ export default {async fetch(req,env){
     const webp=b[0]===82&&b[1]===73&&b[2]===70&&b[3]===70&&b[8]===87&&b[9]===69&&b[10]===66&&b[11]===80;
     if(!(file.type==="image/jpeg"&&jpeg||file.type==="image/png"&&png||file.type==="image/webp"&&webp))return error("Archivo de imagen inválido");
     const objectKey="products/"+id+"/"+crypto.randomUUID()+"."+ext;
-    await env.FOTOS.put(objectKey,file.stream(),{httpMetadata:{contentType:file.type}});
+    await env.FOTOS.put(objectKey,file,{httpMetadata:{contentType:file.type}});
     const photoUrl=url.origin+"/api/photos/"+id+"?v="+Date.now();
     try {
      await env.DB.prepare("UPDATE products SET photo_key=?,photo_url=?,photo_index=NULL,updated_at=? WHERE id=?")
