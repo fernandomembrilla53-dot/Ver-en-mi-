@@ -66,9 +66,13 @@ jobs:
           assert index.index("store-config.js") < index.index("store.js")
           assert '<link rel="stylesheet" href="./store.css">' in index
           assert 'ver-en-mi-tienda.fernandomembrilla53.workers.dev' in cfg
-          assert "panel.hidden=false" in frontend
+          assert 'id="vemProductosMount"' in index and 'data-tab="productos"' in index
+          assert 'id="productos"' in index
+          assert 'id="verProductos"' not in index and 'Yami' not in index
           assert 'assets/producto-' in frontend and 'shop-preview-grid' in frontend
+          assert 'shop-order-dialog' in frontend and 'window.location.assign' in frontend
           assert 'p.photo_url' in frontend and 'p.price_ars>0' in frontend
+          assert 'VEM_ORDER_WHATSAPP' in cfg
           for path in ["./store.css", "./store-config.js", "./store.js"]:
               assert path in sw, path
           expected = admin.replace("export const adminPage", "const adminPage", 1)

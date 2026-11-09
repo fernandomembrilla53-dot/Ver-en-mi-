@@ -1,80 +1,138 @@
-/* Catálogo y carrito para Ver en Mí. Los precios llegan del servidor, nunca de fotos antiguas. */
+/* Pedidos por WhatsApp: la persona revisa y envía el mensaje desde WhatsApp. */
 (() => {
 "use strict";
-const API=String(window.VEM_STORE_API||"").replace(/\/$/,"");
-const money=n=>new Intl.NumberFormat("es-AR",{style:"currency",currency:"ARS",maximumFractionDigits:0}).format(n);
-const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const section=document.getElementById("comidas");
-if(!section)return;
-const panel=document.createElement("div");
-panel.id="vemTienda";panel.className="vem-shop";panel.hidden=false;
-const intro=document.createElement("div");
-intro.innerHTML='<div class="shop-featured">VER EN MÍ · LO SIMPLE DE COMER BIEN</div><h2>Productos caseros</h2><p class="muted">Ensaladas frescas y otras preparaciones del día. Fotos reales de nuestras preparaciones. Consultá disponibilidad y precios cuando se publiquen.</p>';
-const content=document.createElement("div");
-const cartBox=document.createElement("div");cartBox.className="shop-cart";
-const gallery=document.createElement("div");
-gallery.className="shop-photo-preview";
-gallery.setAttribute("aria-label","Galería de fotografías de productos");
-gallery.innerHTML='<div class="shop-photo-preview-head"><h3>Galería de productos</h3><p>Fotografías de nuestros productos. Los precios y la disponibilidad se publicarán próximamente.</p></div>';
-const tiles=document.createElement("div");tiles.className="shop-preview-grid";
-for(let i=0;i<16;i++){
- const tile=document.createElement("figure");tile.className="shop-preview-tile";
- const photo=document.createElement("img");photo.className="shop-preview-image";
- photo.src="./assets/producto-"+String(i+1).padStart(2,"0")+".jpg";
- photo.loading=i<4?"eager":"lazy";photo.decoding="async";
- photo.alt="Fotografía real de producto "+(i+1);
- const cap=document.createElement("figcaption");cap.textContent="Producto "+String(i+1).padStart(2,"0");
- tile.append(photo,cap);tiles.append(tile);
+const mount = document.getElementById("vemProductosMount");
+if (!mount) return;
+const destination = String(window.VEM_ORDER_WHATSAPP || "").replace(/\D/g,"");
+const apiBase = String(window.VEM_STORE_API || "").replace(/\/$/,"");
+const money = n => new Intl.NumberFormat("es-AR",{style:"currency",currency:"ARS",maximumFractionDigits:0}).format(n);
+const preview = document.createElement("div");
+preview.className = "shop-photo-preview";
+const heading = document.createElement("div");
+heading.className = "shop-photo-preview-head";
+const headingTitle = document.createElement("h3");
+headingTitle.textContent = "Elegí el producto que te gusta";
+const headingNote = document.createElement("p");
+headingNote.textContent = "Seleccioná una foto para escribir tu pedido. El precio y la disponibilidad se confirman por WhatsApp.";
+heading.append(headingTitle,headingNote);
+const grid = document.createElement("div");
+grid.className = "shop-preview-grid";
+preview.append(heading,grid);
+mount.append(preview);
+const live = document.createElement("div");
+live.className = "shop-live-products";
+mount.append(live);
+const dialog = document.createElement("dialog");
+dialog.className = "shop-order-dialog";
+dialog.setAttribute("aria-labelledby","vem-order-title");
+dialog.innerHTML = '<div class="shop-order-top"><h2 id="vem-order-title">Consultar producto</h2><button type="button" class="shop-order-close" aria-label="Cerrar">×</button></div>'+
+'<div class="shop-order-choice"><img id="vem-order-preview" alt="Foto del producto elegido"><div><strong id="vem-order-selected"></strong><p id="vem-order-price">Consultá precio y disponibilidad</p></div></div>'+
+'<form id="vem-order-form">'+
+'<label for="vem-order-name">Tu nombre</label><input id="vem-order-name" name="nombre" type="text" autocomplete="name" maxlength="80" required placeholder="Nombre y apellido">'+
+'<label for="vem-order-phone">Tu número de WhatsApp</label><input id="vem-order-phone" name="telefono" type="tel" inputmode="tel" autocomplete="tel" maxlength="24" required placeholder="Ej.: 2494 123456">'+
+'<p class="shop-order-help">Incluí el código de área para que podamos responderte.</p>'+
+'<label for="vem-order-qty">Cantidad</label><input id="vem-order-qty" name="cantidad" type="number" min="1" max="20" value="1" required>'+
+'<label for="vem-order-delivery">¿Cómo lo querés recibir?</label><select id="vem-order-delivery" name="entrega"><option value="A coordinar">A coordinar</option><option value="Retiro">Retiro</option><option value="Envío">Envío</option></select>'+
+'<label for="vem-order-notes">Aclaración (opcional)</label><textarea id="vem-order-notes" name="aclaracion" rows="2" maxlength="240" placeholder="Por ejemplo, para qué día lo necesitás"></textarea>'+
+'<p class="shop-order-notice">Al continuar se abrirá WhatsApp con el producto, tu nombre y tu teléfono. Revisá el mensaje y tocá Enviar en WhatsApp para que llegue al comercio.</p>'+
+'<p id="vem-order-error" role="alert" class="shop-order-error" hidden></p>'+
+'<button type="submit" class="shop-order-submit">Continuar por WhatsApp</button></form>';
+document.body.append(dialog);
+const form = dialog.querySelector("#vem-order-form");
+const errorBox = dialog.querySelector("#vem-order-error");
+let chosen = null;
+function openOrder(product) {
+ chosen = product;
+ form.reset();
+ errorBox.hidden = true;
+ errorBox.textContent = "";
+ dialog.querySelector("#vem-order-selected").textContent = product.name;
+ dialog.querySelector("#vem-order-preview").src = product.photo;
+ dialog.querySelector("#vem-order-price").textContent = product.price ? "Precio publicado: "+money(product.price) : "Consultá precio y disponibilidad";
+ if (typeof dialog.showModal === "function") dialog.showModal();
+ else dialog.setAttribute("open","");
 }
-gallery.append(tiles);
-panel.append(intro,gallery,content,cartBox);
-const first=section.querySelector(".card");if(first)first.after(panel);else section.prepend(panel);
-let products=[],cart=new Map();
-const status=(message,isError=false)=>{content.innerHTML='<p class="'+(isError?'shop-error':'muted')+'">'+esc(message)+'</p>';cartBox.hidden=true;};
-if(!API){status("El catálogo se está preparando. Todavía no hay productos ni precios publicados.");return;}
-const api=(path,opts={})=>fetch(API+path,{cache:"no-store",...opts,headers:{"Content-Type":"application/json",...(opts.headers||{})}}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||"No se pudo conectar");return d});
-const compare=(a,b)=>Number(b.featured)-Number(a.featured)||(a.category==="Ensaladas"?-1:b.category==="Ensaladas"?1:0)||a.name.localeCompare(b.name,"es");
-function draw(){
- content.replaceChildren();const list=document.createElement("div");list.className="shop-grid";
- const sorted=[...products].sort(compare);
- gallery.hidden=sorted.length>0;
- if(!sorted.length){panel.hidden=false;status("Las fotografías ya se pueden explorar. Los nombres, precios y pedidos se habilitarán cuando estén confirmados.");return;}
- panel.hidden=false;
- const title=document.createElement("h3");title.textContent="Ensaladas y especialidades disponibles";content.append(title);
- sorted.forEach(p=>{
-  const item=document.createElement("article");item.className="shop-product";
-  const img=p.photo_url?document.createElement("img"):document.createElement("div");
-  if(p.photo_url){img.src=p.photo_url;img.alt=p.name;img.loading="lazy";img.className="shop-photo";img.onerror=()=>{img.removeAttribute("src");img.alt="Foto pendiente";};}
-  else{img.className="shop-no-photo";img.textContent="Foto próximamente";}
-  const detail=document.createElement("div");detail.className="shop-detail";
-  detail.innerHTML=(p.featured?'<div class="shop-featured">MENÚ DEL DÍA</div>':'')+'<small>'+esc(p.category)+'</small><h3>'+esc(p.name)+'</h3><small>'+esc(p.description||"")+'</small><div class="shop-price">'+money(p.price_ars)+'</div>';
-  const button=document.createElement("button");button.type="button";button.textContent="Agregar al pedido";button.onclick=()=>{cart.set(p.id,Math.min(20,(cart.get(p.id)||0)+1));drawCart()};
-  detail.append(button);item.append(img,detail);list.append(item);
- });
- content.append(list);cartBox.hidden=false;drawCart();
+dialog.querySelector(".shop-order-close").addEventListener("click",() => dialog.close());
+dialog.addEventListener("click",e => {if(e.target===dialog)dialog.close();});
+function addTile(container,product) {
+ const button = document.createElement("button");
+ button.type = "button";
+ button.className = "shop-preview-tile";
+ button.setAttribute("aria-label","Consultar "+product.name+" por WhatsApp");
+ const photo = document.createElement("img");
+ photo.className = "shop-preview-image";
+ photo.src = product.photo;
+ photo.alt = "Fotografía de "+product.name;
+ photo.loading = product.index && product.index<=4 ? "eager" : "lazy";
+ photo.decoding = "async";
+ const caption = document.createElement("span");
+ caption.className = "shop-preview-caption";
+ caption.textContent = product.name;
+ const hint = document.createElement("span");
+ hint.className = "shop-preview-action";
+ hint.textContent = "Consultar por WhatsApp";
+ button.append(photo,caption,hint);
+ button.addEventListener("click",() => openOrder(product));
+ container.append(button);
 }
-function drawCart(){
- cartBox.replaceChildren();const title=document.createElement("h3");title.textContent="Mi pedido";cartBox.append(title);
- let total=0;for(const [id,qty] of [...cart]){const p=products.find(x=>x.id===id);if(!p){cart.delete(id);continue;}total+=p.price_ars*qty;
- const line=document.createElement("div");line.className="shop-line";
- const label=document.createElement("span");label.textContent=p.name+" · "+money(p.price_ars*qty);
- const qtyBox=document.createElement("span");qtyBox.className="shop-qty";
- for(const [sign,amount] of [["−",-1],["+",1]]){const b=document.createElement("button");b.type="button";b.textContent=sign;b.setAttribute("aria-label",sign==="+"?"Sumar "+p.name:"Quitar "+p.name);b.onclick=()=>{const next=qty+amount;if(next<=0)cart.delete(id);else cart.set(id,Math.min(20,next));drawCart()};qtyBox.append(b)}
- const n=document.createElement("strong");n.textContent=qty;qtyBox.insertBefore(n,qtyBox.lastChild);
- line.append(label,qtyBox);cartBox.append(line);
+for (let i=1;i<=16;i++) {
+ const code = String(i).padStart(2,"0");
+ const url = new URL("./assets/producto-"+code+".jpg",document.baseURI).href;
+ addTile(grid,{index:i,code:"FOTO-"+code,name:"Producto "+code,photo:url,price:null});
+}
+form.addEventListener("submit",e => {
+ e.preventDefault();
+ if(!chosen || !form.reportValidity()) return;
+ const fd = new FormData(form);
+ const name = String(fd.get("nombre")||"").trim();
+ const phone = String(fd.get("telefono")||"").trim();
+ const digits = phone.replace(/\D/g,"");
+ const qty = Number(fd.get("cantidad"));
+ if(!name || digits.length<8 || digits.length>15) {
+  errorBox.textContent="Escribí un nombre y un número de WhatsApp válido, con código de área.";
+  errorBox.hidden=false;
+  return;
  }
- if(!total){const empty=document.createElement("p");empty.className="shop-cart-empty";empty.textContent="Elegí lo que querés comprar y aparecerá acá.";cartBox.append(empty);return;}
- const amount=document.createElement("p");amount.innerHTML="<strong>Total estimado: "+money(total)+"</strong>";cartBox.append(amount);
- const form=document.createElement("form");form.innerHTML='<label>Nombre <input name="nombre" required maxlength="100" autocomplete="name"></label><label>Teléfono <input name="telefono" required maxlength="30" type="tel" autocomplete="tel"></label><label>Entrega <select name="entrega"><option value="retiro">Retiro a coordinar</option><option value="envio">Envío a coordinar</option></select></label><label>Dirección (solo si pedís envío) <input name="direccion" maxlength="180"></label><label>Indicaciones (opcional) <textarea name="notas" maxlength="300" rows="2"></textarea></label><button type="submit">Enviar pedido</button><p class="muted">La compra queda solicitada. El comercio confirmará disponibilidad, entrega y pago.</p>';
- const msg=document.createElement("p");msg.setAttribute("role","status");form.append(msg);
- form.onsubmit=async e=>{e.preventDefault();const fd=new FormData(form),button=form.querySelector("button[type=submit]");button.disabled=true;msg.textContent="Enviando…";
- try{const payload={name:fd.get("nombre"),phone:fd.get("telefono"),delivery:fd.get("entrega"),address:fd.get("direccion"),notes:fd.get("notas"),quoted_total_ars:total,items:[...cart].map(([id,quantity])=>({id,quantity}))};
- const result=await api("/api/orders",{method:"POST",body:JSON.stringify(payload)});
- cart.clear();drawCart();const ok=document.createElement("p");ok.className="shop-success";ok.setAttribute("role","status");ok.textContent="Pedido #"+result.order_id+" registrado. Recibirás una confirmación del comercio.";cartBox.append(ok);
- }catch(err){msg.className="shop-error";msg.textContent=err.message;button.disabled=false;}};
- cartBox.append(form);
+ if(!Number.isInteger(qty) || qty<1 || qty>20 || destination.length<10 || destination.length>15) {
+  errorBox.textContent="No se pudo preparar el pedido. Revisá la cantidad o contactá con el comercio.";
+  errorBox.hidden=false;
+  return;
+ }
+ const delivery = String(fd.get("entrega")||"A coordinar");
+ const notes = String(fd.get("aclaracion")||"").trim();
+ const lines = [
+  "Hola, quiero consultar o pedir un producto de Ver en Mi.",
+  "",
+  "Producto: "+chosen.name,
+  "Referencia: "+chosen.code,
+  "Foto: "+chosen.photo,
+  "Cantidad: "+qty,
+  "Nombre: "+name,
+  "Mi WhatsApp para responderme: "+phone,
+  "Entrega: "+delivery
+ ];
+ if(chosen.price)lines.push("Precio publicado por unidad: "+money(chosen.price));
+ if(notes)lines.push("Aclaración: "+notes);
+ lines.push("","Por favor, confirmame disponibilidad y precio final. ¡Gracias!");
+ dialog.close();
+ window.location.assign("https://wa.me/"+destination+"?text="+encodeURIComponent(lines.join("\n")));
+});
+async function loadPublished() {
+ if(!apiBase) return;
+ try{
+  const response=await fetch(apiBase+"/api/menu",{cache:"no-store"});
+  if(!response.ok) return;
+  const data=await response.json();
+  const products=Array.isArray(data.products) ? data.products.filter(p=>p&&typeof p.name==="string"&&p.name.trim()&&typeof p.photo_url==="string"&&/^https:\/\//.test(p.photo_url)&&Number.isSafeInteger(p.price_ars)&&p.price_ars>0) : [];
+  live.replaceChildren();
+  if(!products.length) return;
+  const title=document.createElement("h3");title.textContent="Productos con precio publicado";
+  const list=document.createElement("div");list.className="shop-preview-grid";
+  products.forEach(p=>addTile(list,{name:p.name.trim(),code:"CAT-"+String(p.id||"").slice(0,36),photo:p.photo_url,price:p.price_ars}));
+  live.append(title,list);
+ }catch(_){ /* La galería con fotografías sigue funcionando sin conexión al catálogo. */ }
 }
-async function reload(){try{const data=await api("/api/menu");products=Array.isArray(data.products)?data.products.filter(p=>typeof p.id==="string"&&typeof p.name==="string"&&p.name.trim()&&typeof p.photo_url==="string"&&p.photo_url&&Number.isSafeInteger(p.price_ars)&&p.price_ars>0):[];draw()}catch(e){panel.hidden=false;status("La tienda no pudo conectarse por ahora. El resto de Ver en Mi sigue disponible.",true);}}
-document.getElementById("verProductos")?.addEventListener("click",()=>{document.querySelector('nav [data-tab="comidas"]')?.click();});
-reload();window.addEventListener("online",reload);document.addEventListener("visibilitychange",()=>{if(!document.hidden)reload()});window.addEventListener("focus",reload);setInterval(()=>{if(!document.hidden)reload()},120000);
+loadPublished();
+window.addEventListener("online",loadPublished);
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)loadPublished();});
 })();

@@ -16,15 +16,6 @@
 .vem-shop .shop-error{color:#9d2828}.vem-shop .shop-success{color:#146943}.vem-shop .shop-featured{font-size:11px;letter-spacing:1px;color:#176c50;font-weight:800}
 .vem-shop .shop-qty{display:inline-flex;align-items:center;gap:8px}.vem-shop .shop-cart-empty{color:var(--muted,#65796d);font-size:14px}
 
-/* Lanzamiento visible desde Inicio; sin habilitar pedidos no verificados. */
-.vem-shop-teaser{position:relative;overflow:hidden;background:linear-gradient(135deg,#ecfff0 0%,#e1f2e8 55%,#fff7df 100%);border:1px solid #c9e5d2;padding:1.3rem;box-shadow:0 8px 25px rgba(35,97,69,.09)}
-.vem-shop-teaser::after{content:"";position:absolute;right:-36px;top:-40px;width:150px;height:150px;border-radius:50%;background:radial-gradient(circle,#a4dbab55 0%,#a4dbab00 68%);pointer-events:none}
-.vem-shop-teaser h2{margin:.4rem 0 .5rem;font-size:1.5rem;color:#194f39}
-.vem-shop-teaser p{max-width:42ch;line-height:1.55;margin-bottom:1rem;color:#315747}
-.vem-shop-teaser .vem-shop-eyebrow{display:inline-flex;padding:.3rem .65rem;border-radius:999px;background:#255d43;color:#fff;font-size:.69rem;font-weight:750;letter-spacing:.09em}
-.vem-shop-teaser button{margin:0 0 .8rem}
-.vem-shop-teaser small{display:block;max-width:47ch;color:#486354}
-
 /* Galería de fotografías individuales sin recortes ni precios ficticios. */
 .shop-photo-preview{padding:1rem 0 1.25rem}
 .shop-photo-preview-head h3{margin:0 0 .25rem;font-size:1.2rem}
@@ -35,3 +26,40 @@
 .shop-preview-image{display:block;aspect-ratio:1 / 1;width:100%;height:auto;object-fit:contain;border-radius:10px;background-color:#eef2ef}
 .shop-preview-tile figcaption{text-align:center;font-size:.7rem;color:#597265;margin:.45rem 0 .16rem}
 .shop-photo-preview[hidden]{display:none!important}
+
+/* Sección independiente y accesible de pedidos por WhatsApp. */
+.shop-section-intro{background:linear-gradient(135deg,#e6f7e9,#f9f2dd);border-color:#b9dfc5}
+.shop-section-intro h2{color:#195c43;font-size:1.7rem;margin:6px 0 8px}
+.shop-section-intro p{font-size:.95rem;color:#325c4b;margin:0;line-height:1.65}
+.shop-mini-label{display:inline-block;border-radius:999px;background:#185f45;color:#fff;padding:5px 12px;font-size:10px;font-weight:850;letter-spacing:1.2px}
+.shop-photo-preview{background:var(--surface,#fff);border:1px solid var(--line,#dce9df);border-radius:22px;padding:18px;box-shadow:var(--shadow,0 8px 24px #101e1820)}
+.shop-photo-preview-head h3,.shop-live-products h3{font-size:1.25rem;color:var(--ink,#173930);margin:0 0 8px}
+.shop-photo-preview-head p{font-size:.92rem;margin:0 0 18px;line-height:1.55;color:var(--muted,#647b72)}
+.shop-preview-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media(min-width:650px){.shop-preview-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+button.shop-preview-tile{display:flex;flex-direction:column;gap:6px;align-items:center;text-align:center;min-width:0;width:100%;padding:8px 8px 12px;border:1px solid var(--line,#d8e7da);border-radius:16px;background:var(--surface-soft,#f8faf7);color:var(--ink,#173930);box-shadow:0 3px 11px #102b1920;cursor:pointer;transition:transform .17s ease,box-shadow .17s ease}
+button.shop-preview-tile:active{transform:scale(.97)}
+button.shop-preview-tile:focus-visible{outline:3px solid var(--brand,#148b6b);outline-offset:3px}
+.shop-preview-image{display:block;width:100%;aspect-ratio:1 / 1;object-fit:contain;background:var(--surface-soft,#eef2ef);border-radius:12px}
+.shop-preview-caption{font-weight:800;font-size:.88rem;line-height:1.35}
+.shop-preview-action{font-size:.72rem;color:#167b5c;font-weight:850}
+.shop-live-products{margin-top:20px}
+.shop-live-products:empty{display:none}
+.shop-order-dialog{border:0;border-radius:23px;padding:20px;width:min(calc(100vw - 28px),470px);max-height:min(92dvh,900px);overflow-y:auto;background:var(--surface,#fff);color:var(--ink,#173930);box-shadow:0 24px 70px #0008;z-index:1200}
+.shop-order-dialog::backdrop{background:#061f1bcc;backdrop-filter:blur(3px)}
+.shop-order-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.shop-order-top h2{font-size:1.3rem;margin:0}
+button.shop-order-close{font-size:26px;width:42px;height:42px;padding:0;border:0;border-radius:13px;background:var(--surface-soft,#e9f1ec);color:var(--ink,#183930);cursor:pointer}
+.shop-order-choice{display:grid;grid-template-columns:95px 1fr;gap:13px;align-items:center;padding:10px;background:var(--surface-soft,#f2f7f4);border-radius:15px;margin-bottom:13px}
+.shop-order-choice img{width:95px;height:100px;object-fit:contain;border-radius:10px}
+.shop-order-choice strong{font-size:1rem}
+.shop-order-choice p{font-size:.83rem;color:var(--muted,#66796c);margin:5px 0}
+.shop-order-dialog label{display:block;font-size:.82rem;font-weight:750;margin:13px 0 5px}
+.shop-order-dialog input,.shop-order-dialog select,.shop-order-dialog textarea{width:100%;min-height:45px;border-radius:12px;border:1px solid var(--line,#bfcfc2);background:var(--surface-soft,#fff);color:var(--ink,#243a30);padding:11px 12px;font:inherit;box-sizing:border-box}
+.shop-order-help,.shop-order-notice{font-size:.78rem;line-height:1.5;color:var(--muted,#607669);margin:6px 0 13px}
+.shop-order-notice{background:var(--surface-soft,#f0f7ef);border-radius:11px;padding:11px}
+.shop-order-error{font-size:.85rem;color:#c13535}
+.shop-order-submit{width:100%;border:0;border-radius:13px;background:#168363;color:white;min-height:51px;padding:12px;font-size:1rem;font-weight:850;cursor:pointer}
+html[data-theme="dark"] .shop-section-intro{background:linear-gradient(135deg,#183e33,#2a392c)}
+html[data-theme="dark"] .shop-section-intro h2,html[data-theme="dark"] .shop-section-intro p{color:#d8efdc}
+html[data-theme="dark"] .shop-preview-action{color:#8de5bd}
