@@ -1,5 +1,5 @@
 /* Ver en Mi: offline con actualización resiliente y caché acotada. */
-const CACHE="ver-en-mi-v7";
+const CACHE="ver-en-mi-v8";
 const FILES=["./","./index.html","./daily.js","./premium.css","./manifest.json","./icon.svg","./icon-192.png","./icon-512.png","./privacidad.html","./store.css","./store-config.js","./store.js"];
 const APP_SHELL=new URL("./index.html",self.registration.scope).href;
 self.addEventListener("install",event=>{
