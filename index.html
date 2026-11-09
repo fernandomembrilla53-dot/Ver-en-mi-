@@ -296,7 +296,7 @@ $('historial').innerHTML=arr.length?arr.slice().reverse().map(r=>'<div class="it
 }
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
 document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('active',x===b));
-document.querySelectorAll('main section').forEach(s=>s.classList.toggle('hidden',s.id!==b.dataset.tab));
+document.querySelectorAll('main > section').forEach(s=>s.classList.toggle('hidden',s.id!==b.dataset.tab));
 if(b.dataset.tab==='progreso')mostrarHistorial();
 });
 $('guardar').onclick=()=>{
