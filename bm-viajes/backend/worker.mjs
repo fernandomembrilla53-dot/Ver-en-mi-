@@ -73,11 +73,15 @@ async function startAuth(req,env){
 async function verifyAuth(req,env){
  const body=await jsonInput(req),email=safeEmail(body?.email),code=body?.code;
  if(!email||typeof code!=="string"||!/^[0-9]{6}$/.test(code))throw new ApiError("Correo o código inválido.",400);
- const row=await env.DB.prepare("SELECT code_hash,expires_at,attempts FROM otp_challenges WHERE email=?").bind(email).first();
- if(!row||row.expires_at<Date.now()||row.attempts>=5)throw new ApiError("Código inválido o vencido.",401);
+ // Reservar cada intento de forma atómica ANTES de comprobar el código.
+ // Evita que peticiones paralelas eludan el máximo de cinco intentos.
+ const row=await env.DB.prepare("SELECT code_hash FROM otp_challenges WHERE email=?").bind(email).first();
+ if(!row)throw new ApiError("Código inválido o vencido.",401);
+ const reserved=await env.DB.prepare("UPDATE otp_challenges SET attempts=attempts+1 WHERE email=? AND code_hash=? AND expires_at>? AND attempts<5").bind(email,row.code_hash,Date.now()).run();
+ if(!reserved.meta?.changes)throw new ApiError("Código inválido o vencido.",401);
  const ok=await sha256(email+"|"+code+"|"+env.AUTH_SECRET)===row.code_hash;
- if(!ok){await env.DB.prepare("UPDATE otp_challenges SET attempts=attempts+1 WHERE email=?").bind(email).run();throw new ApiError("Código inválido o vencido.",401);}
- const consumed=await env.DB.prepare("DELETE FROM otp_challenges WHERE email=? AND code_hash=? AND expires_at>? AND attempts<5").bind(email,row.code_hash,Date.now()).run();
+ if(!ok)throw new ApiError("Código inválido o vencido.",401);
+ const consumed=await env.DB.prepare("DELETE FROM otp_challenges WHERE email=? AND code_hash=? AND expires_at>? AND attempts<=5").bind(email,row.code_hash,Date.now()).run();
  if(!consumed.meta?.changes)throw new ApiError("Código ya utilizado.",401);
  const now=Date.now(),userId=crypto.randomUUID();
  await env.DB.prepare("INSERT INTO users(id,email,created_at) VALUES(?,?,?) ON CONFLICT(email) DO NOTHING").bind(userId,email,now).run();
