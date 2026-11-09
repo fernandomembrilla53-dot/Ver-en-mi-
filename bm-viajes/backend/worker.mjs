@@ -107,7 +107,7 @@ async function newRide(req,env,user){
  return json({ok:true,ride_id:id,status:"requested",distance_air_km:Number(air.toFixed(2)),fare_ars:null,payment_status:"not_implemented",message:"Sin tarifa ni pago confirmado. Coordinación de prueba sujeta a habilitación."},201);
 }
 async function myRides(env,user){
- const result=await env.DB.prepare("SELECT id,status,driver_id,origin_lat,origin_lng,destination_lat,destination_lng,created_at,updated_at FROM rides WHERE rider_id=? OR driver_id=? ORDER BY created_at DESC LIMIT 30").bind(user.id,user.id).all();
+ const result=await env.DB.prepare("SELECT id,status,rider_id,driver_id,origin_lat,origin_lng,destination_lat,destination_lng,created_at,updated_at FROM rides WHERE rider_id=? OR driver_id=? ORDER BY created_at DESC LIMIT 30").bind(user.id,user.id).all();
  return json({ok:true,rides:result.results||[]});
 }
 async function openRides(env,user){
