@@ -1,6 +1,6 @@
 /* BM Viajes: la app se puede abrir sin conexión; los mapas requieren Internet.
    Nunca guarda en caché ubicaciones GPS ni datos del servidor. */
-const CACHE="bm-viajes-shell-2026-11-09-v5";
+const CACHE="bm-viajes-shell-2026-11-09-v6";
 const SHELL=["./","./index.html","./manifest.webmanifest","./icon.svg","./icon-192.png","./icon-512.png","./enhancements.js","./piloto.html","./pilot.js","./config.js","./privacidad.html"];
 self.addEventListener("install",event=>{
  event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL)).then(()=>self.skipWaiting()));
@@ -13,7 +13,8 @@ self.addEventListener("fetch",event=>{
  if(request.method!=="GET")return;
  const url=new URL(request.url);
  if(url.origin!==self.location.origin)return; // No cachear tiles, pagos, API ni CDN.
- if(!url.pathname.includes("/bm-viajes/"))return;
+ const scopePath=new URL(self.registration.scope).pathname;
+ if(!url.pathname.startsWith(scopePath))return;
  // Navegaciones: no almacenar respuestas HTML arbitrarias (podrían contener datos personales).
  // La pantalla piloto tiene su propio fallback; rutas desconocidas no se disfrazan de inicio.
  if(request.mode==="navigate"){
@@ -29,9 +30,8 @@ self.addEventListener("fetch",event=>{
   }));
   return;
  }
- if(url.pathname.includes("/api/"))return;
- event.respondWith(caches.match(request).then(hit=>hit||fetch(request).then(response=>{
-   if(response.ok && response.type==="basic"){const copy=response.clone();event.waitUntil(caches.open(CACHE).then(cache=>cache.put(request,copy)));}
-   return response;
- })));
+ // Solo recursos públicos explícitos: nunca cachear endpoints, parámetros ni rutas nuevas.
+ const allowed=new Set(SHELL.map(path=>new URL(path,self.registration.scope).pathname));
+ if(url.search || !allowed.has(url.pathname))return;
+ event.respondWith(caches.match(request).then(hit=>hit||fetch(request)));
 });
