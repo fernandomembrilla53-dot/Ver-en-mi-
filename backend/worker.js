@@ -103,7 +103,7 @@ export default {async fetch(req,env){
    return json({ok:true},200,{"Set-Cookie":cookieName+"="+await signedCookie(env)+"; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=86400"});
   }
   if(path.startsWith("/api/admin/")){
-   if(!await isAdmin(req,env))return error("Acceso de Yami requerido",401);
+   if(!await isAdmin(req,env))return error("Acceso de administración requerido",401);
    if(method!=="GET"&&req.headers.get("Origin")!==url.origin)return error("Origen no autorizado",403);
    if(path==="/api/admin/logout"&&method==="POST")return json({ok:true},200,{"Set-Cookie":cookieName+"=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0"});
    if(path==="/api/admin/products"&&method==="GET"){
