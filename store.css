@@ -15,3 +15,12 @@
 .vem-shop label{display:block;margin:10px 0;font-weight:600;font-size:13px}
 .vem-shop .shop-error{color:#9d2828}.vem-shop .shop-success{color:#146943}.vem-shop .shop-featured{font-size:11px;letter-spacing:1px;color:#176c50;font-weight:800}
 .vem-shop .shop-qty{display:inline-flex;align-items:center;gap:8px}.vem-shop .shop-cart-empty{color:var(--muted,#65796d);font-size:14px}
+
+/* Lanzamiento visible desde Inicio; sin habilitar pedidos no verificados. */
+.vem-shop-teaser{position:relative;overflow:hidden;background:linear-gradient(135deg,#ecfff0 0%,#e1f2e8 55%,#fff7df 100%);border:1px solid #c9e5d2;padding:1.3rem;box-shadow:0 8px 25px rgba(35,97,69,.09)}
+.vem-shop-teaser::after{content:"";position:absolute;right:-36px;top:-40px;width:150px;height:150px;border-radius:50%;background:radial-gradient(circle,#a4dbab55 0%,#a4dbab00 68%);pointer-events:none}
+.vem-shop-teaser h2{margin:.4rem 0 .5rem;font-size:1.5rem;color:#194f39}
+.vem-shop-teaser p{max-width:42ch;line-height:1.55;margin-bottom:1rem;color:#315747}
+.vem-shop-teaser .vem-shop-eyebrow{display:inline-flex;padding:.3rem .65rem;border-radius:999px;background:#255d43;color:#fff;font-size:.69rem;font-weight:750;letter-spacing:.09em}
+.vem-shop-teaser button{margin:0 0 .8rem}
+.vem-shop-teaser small{display:block;max-width:47ch;color:#486354}
