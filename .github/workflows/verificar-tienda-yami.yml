@@ -1,0 +1,36 @@
+name: Verificar tienda de Yami
+on:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'store.js'
+      - 'store.css'
+      - 'privacidad.html'
+      - '.github/workflows/verificar-tienda-yami.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validar JavaScript
+        run: |
+          node --check backend/worker.js
+          node --check backend/admin-page.js
+          node --check store.js
+          node --check store-config.js
+          node --check sw.js
+      - name: Validar esquema D1 en SQLite
+        run: |
+          python3 - <<'PY'
+          import sqlite3, pathlib
+          db=sqlite3.connect(':memory:')
+          db.executescript(pathlib.Path('backend/schema.sql').read_text())
+          tables={r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+          assert {'products','orders','order_items','request_limits'} <= tables, tables
+          columns={r[1] for r in db.execute("PRAGMA table_info(products)")}
+          assert {'photo_key','photo_url','price_ars','active','available','featured'} <= columns
+          print('D1 schema compatible con SQLite: OK')
+          PY
