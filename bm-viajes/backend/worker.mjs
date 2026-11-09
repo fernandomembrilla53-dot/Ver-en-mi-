@@ -164,7 +164,8 @@ async function driverPosition(req,env,user,id){
 async function getDriverPosition(env,user,id){
  const ride=await rideAccess(env,user,id);
  if(!["accepted","in_progress"].includes(ride.status))return json({ok:true,position:null});
- const p=await env.DB.prepare("SELECT lat,lng,accuracy_m,updated_at FROM ride_positions WHERE ride_id=? AND updated_at>?").bind(id,Date.now()-120000).first();
+ // Comprobar el estado del viaje en la misma lectura: nunca devolver GPS tras una cancelación concurrente.
+ const p=await env.DB.prepare("SELECT p.lat,p.lng,p.accuracy_m,p.updated_at FROM ride_positions p JOIN rides r ON r.id=p.ride_id WHERE p.ride_id=? AND r.status IN ('accepted','in_progress') AND p.updated_at>?").bind(id,Date.now()-120000).first();
  return json({ok:true,position:p||null});
 }
 async function main(req,env){
