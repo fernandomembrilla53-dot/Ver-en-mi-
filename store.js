@@ -16,7 +16,22 @@ panel.append(intro,content,cartBox);
 const first=section.querySelector(".card");if(first)first.after(panel);else section.prepend(panel);
 let products=[],cart=new Map();
 const status=(message,isError=false)=>{content.innerHTML='<p class="'+(isError?'shop-error':'muted')+'">'+esc(message)+'</p>';cartBox.hidden=true;};
-if(!API){status("Yami todavía está preparando los nombres y precios actuales. La tienda se habilitará cuando esté conectado el panel de administración.");return;}
+if(!API){
+  const note=document.createElement("p");note.className="muted";note.textContent="Las fotos ya están cargadas. Yami agregará los nombres, ingredientes y precios actuales. Todavía no se reciben pedidos desde esta sección.";
+  content.append(note);
+  const grid=document.createElement("div");grid.className="shop-grid";
+  for(let i=0;i<16;i++){
+    const item=document.createElement("article");item.className="shop-product";
+    const photo=document.createElement("div");photo.className="shop-photo";photo.style.backgroundImage='url("./assets/catalogo-yami-16.svg")';
+    photo.style.backgroundSize="400% 400%";photo.style.backgroundPosition=((i%4)*100/3)+"% "+(Math.floor(i/4)*100/3)+"%";
+    photo.setAttribute("role","img");photo.setAttribute("aria-label","Foto real de un producto de Yami, sin identificar");
+    const desc=document.createElement("div");desc.className="shop-detail";
+    const name=document.createElement("strong");name.textContent="Producto por identificar · foto "+String(i+1).padStart(2,"0");
+    const detail=document.createElement("small");detail.textContent="Nombre y precio pendientes de Yami";
+    desc.append(name,detail);item.append(photo,desc);grid.append(item);
+  }
+  content.append(grid);cartBox.hidden=true;return;
+}
 const api=(path,opts={})=>fetch(API+path,{...opts,headers:{"Content-Type":"application/json",...(opts.headers||{})}}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||"No se pudo conectar");return d});
 const compare=(a,b)=>Number(b.featured)-Number(a.featured)||(a.category==="Ensaladas"?-1:b.category==="Ensaladas"?1:0)||a.name.localeCompare(b.name,"es");
 function draw(){
