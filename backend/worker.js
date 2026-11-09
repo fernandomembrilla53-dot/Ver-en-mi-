@@ -34,26 +34,38 @@ async function notifyOrder(env,order,items){
  return response.ok;
  }catch(_){return false}
 }
+
+/* Create missing D1 tables on first request (avoids Cloudflare SQL console challenge). */
+const INITIAL_SQL = ["CREATE TABLE IF NOT EXISTS products (\n id TEXT PRIMARY KEY,\n name TEXT NOT NULL DEFAULT '',\n description TEXT NOT NULL DEFAULT '',\n category TEXT NOT NULL DEFAULT 'Por clasificar',\n price_ars INTEGER,\n photo_index INTEGER UNIQUE,\n photo_url TEXT,\n photo_key TEXT,\n active INTEGER NOT NULL DEFAULT 0,\n available INTEGER NOT NULL DEFAULT 1,\n featured INTEGER NOT NULL DEFAULT 0,\n menu_date TEXT NOT NULL DEFAULT '',\n created_at TEXT NOT NULL,\n updated_at TEXT NOT NULL\n)","CREATE INDEX IF NOT EXISTS products_active ON products(active,available,category)","CREATE TABLE IF NOT EXISTS orders (\n id TEXT PRIMARY KEY,\n name TEXT NOT NULL,\n phone TEXT NOT NULL,\n delivery TEXT NOT NULL,\n address TEXT NOT NULL DEFAULT '',\n notes TEXT NOT NULL DEFAULT '',\n total_ars INTEGER NOT NULL,\n status TEXT NOT NULL DEFAULT 'pendiente',\n created_at TEXT NOT NULL\n)","CREATE TABLE IF NOT EXISTS order_items (\n id INTEGER PRIMARY KEY AUTOINCREMENT,\n order_id TEXT NOT NULL REFERENCES orders(id),\n product_id TEXT NOT NULL,\n product_name TEXT NOT NULL,\n quantity INTEGER NOT NULL,\n unit_price_ars INTEGER NOT NULL\n)","CREATE TABLE IF NOT EXISTS request_limits (\n identity TEXT NOT NULL,\n at_time INTEGER NOT NULL\n)","CREATE INDEX IF NOT EXISTS request_limits_lookup ON request_limits(identity,at_time)","CREATE TABLE IF NOT EXISTS product_photos (\n product_id TEXT PRIMARY KEY,\n content_type TEXT NOT NULL,\n image_base64 TEXT NOT NULL,\n updated_at TEXT NOT NULL\n)"];
+let initPromise;
+async function initializeDatabase(db) {
+ if(!initPromise) initPromise=db.batch(INITIAL_SQL.map(sql=>db.prepare(sql))).catch(e=>{initPromise=null;throw e});
+ return initPromise;
+}
+function base64FromBytes(bytes){
+ let out="";for(let i=0;i<bytes.length;i+=16384)out+=String.fromCharCode(...bytes.subarray(i,i+16384));
+ return btoa(out);
+}
+
 export default {async fetch(req,env){
  const url=new URL(req.url),path=url.pathname,method=req.method;
  if(!env.DB)return error("Base de datos sin configurar",503);
+ try{await initializeDatabase(env.DB)}catch(e){console.error("D1 init",e?.message);return error("No se pudo configurar la base de datos",503);}
  if(method==="OPTIONS"&&path.startsWith("/api/")&&allowedOrigin(req,env))return new Response(null,{status:204,headers:cors(req,env)});
  if(path==="/admin"&&method==="GET")return new Response(adminPage,{headers:{"content-type":"text/html;charset=utf-8","cache-control":"no-store","X-Frame-Options":"DENY","Referrer-Policy":"no-referrer","X-Content-Type-Options":"nosniff"}});
  if(/^\/api\/photos\/[a-z0-9-]+$/.test(path)&&method==="GET"){
   const id=path.slice("/api/photos/".length);
-  const p=await env.DB.prepare("SELECT photo_key,active FROM products WHERE id=?").bind(id).first();
-  if(!p?.photo_key||!env.FOTOS)return error("Foto no encontrada",404);
-  if(!p.active&&!await isAdmin(req,env))return error("Foto no disponible",404);
-  const obj=await env.FOTOS.get(p.photo_key);
-  if(!obj)return error("Foto no encontrada",404);
-  return new Response(obj.body,{headers:{
-   "content-type":obj.httpMetadata?.contentType||"image/jpeg",
-   "x-content-type-options":"nosniff",
-   "cache-control":p.active?"public,max-age=300":"private,no-store",
-   "access-control-allow-origin":"*",
-   "cross-origin-resource-policy":"cross-origin"
-  }});
+  try {
+   const p=await env.DB.prepare("SELECT active,available FROM products WHERE id=?").bind(id).first();
+   if(!p)return error("Foto no encontrada",404);
+   if((!p.active||!p.available)&&!await isAdmin(req,env))return error("Foto no disponible",404);
+   const photo=await env.DB.prepare("SELECT content_type,image_base64 FROM product_photos WHERE product_id=?").bind(id).first();
+   if(!photo)return error("Foto no encontrada",404);
+   const binary=Uint8Array.from(atob(photo.image_base64),c=>c.charCodeAt(0));
+   return new Response(binary,{headers:{"content-type":photo.content_type,"x-content-type-options":"nosniff","cache-control":p.active?"public,max-age=300":"private,no-store","access-control-allow-origin":"*","cross-origin-resource-policy":"cross-origin"}});
+  }catch(e){console.error("Photo error",e?.message);return error("No se pudo abrir la foto",500)}
  }
+
  try{
   if(path==="/api/menu"&&method==="GET"){
    const q=await env.DB.prepare("SELECT * FROM products WHERE active=1 AND available=1 AND name <> '' AND price_ars IS NOT NULL AND price_ars > 0 ORDER BY CASE WHEN featured=1 AND menu_date=? THEN 0 ELSE 1 END, CASE WHEN category='Ensaladas' THEN 0 ELSE 1 END, updated_at DESC LIMIT 200").bind(tzToday()).all();
@@ -107,28 +119,24 @@ export default {async fetch(req,env){
    }
    const uploadMatch=/^\/api\/admin\/products\/([a-z0-9-]+)\/photo$/.exec(path);
    if(uploadMatch&&method==="POST"){
-    if(!env.FOTOS)return error("Almacenamiento de fotografías sin configurar",503);
-    const id=uploadMatch[1],current=await env.DB.prepare("SELECT id,photo_key FROM products WHERE id=?").bind(id).first();
+    const id=uploadMatch[1],current=await env.DB.prepare("SELECT id FROM products WHERE id=?").bind(id).first();
     if(!current)return error("Producto no encontrado",404);
-    const size=Number(req.headers.get("content-length")||0);
-    if(size>14*1024*1024)return error("La foto supera el tamaño máximo",413);
+    if(Number(req.headers.get("content-length")||0)>1024*1024)return error("Foto demasiado grande. Reducí su tamaño.",413);
     const form=await req.formData(),file=form.get("photo");
-    if(!(file instanceof File)||file.size<100||file.size>12*1024*1024)return error("Elegí una foto de menos de 12 MB");
+    if(!(file instanceof File)||file.size<100||file.size>650000)return error("La foto debe pesar menos de 650 KB después de optimizarla");
     const mime={"image/jpeg":"jpg","image/png":"png","image/webp":"webp"};
-    const ext=mime[file.type];if(!ext)return error("Solo se admiten fotos JPG, PNG o WebP");
-    const b=new Uint8Array(await file.slice(0,12).arrayBuffer());
-    const jpeg=b[0]===255&&b[1]===216&&b[2]===255;
-    const png=b[0]===137&&b[1]===80&&b[2]===78&&b[3]===71&&b[4]===13&&b[5]===10;
-    const webp=b[0]===82&&b[1]===73&&b[2]===70&&b[3]===70&&b[8]===87&&b[9]===69&&b[10]===66&&b[11]===80;
-    if(!(file.type==="image/jpeg"&&jpeg||file.type==="image/png"&&png||file.type==="image/webp"&&webp))return error("Archivo de imagen inválido");
-    const objectKey="products/"+id+"/"+crypto.randomUUID()+"."+ext;
-    await env.FOTOS.put(objectKey,file,{httpMetadata:{contentType:file.type}});
+    if(!mime[file.type])return error("Solo se admiten JPG, PNG o WebP");
+    const buffer=new Uint8Array(await file.arrayBuffer());
+    const jpeg=buffer[0]===255&&buffer[1]===216&&buffer[2]===255;
+    const png=buffer[0]===137&&buffer[1]===80&&buffer[2]===78&&buffer[3]===71;
+    const webp=buffer[0]===82&&buffer[1]===73&&buffer[2]===70&&buffer[3]===70&&buffer[8]===87&&buffer[9]===69;
+    if(!(file.type==="image/jpeg"&&jpeg||file.type==="image/png"&&png||file.type==="image/webp"&&webp))return error("Formato de foto inválido");
+    const now=new Date().toISOString(),encoded=base64FromBytes(buffer);
     const photoUrl=url.origin+"/api/photos/"+id+"?v="+Date.now();
-    try {
-     await env.DB.prepare("UPDATE products SET photo_key=?,photo_url=?,photo_index=NULL,updated_at=? WHERE id=?")
-       .bind(objectKey,photoUrl,new Date().toISOString(),id).run();
-    }catch(e){await env.FOTOS.delete(objectKey);throw e;}
-    if(current.photo_key)await env.FOTOS.delete(current.photo_key).catch(()=>{});
+    await env.DB.batch([
+     env.DB.prepare("INSERT INTO product_photos(product_id,content_type,image_base64,updated_at) VALUES(?,?,?,?) ON CONFLICT(product_id) DO UPDATE SET content_type=excluded.content_type,image_base64=excluded.image_base64,updated_at=excluded.updated_at").bind(id,file.type,encoded,now),
+     env.DB.prepare("UPDATE products SET photo_key=?,photo_url=?,photo_index=NULL,updated_at=? WHERE id=?").bind("d1:"+id,photoUrl,now,id)
+    ]);
     return json({ok:true,photo_url:photoUrl});
    }
    const match=/^\/api\/admin\/products\/([\w-]+)$/.exec(path);
