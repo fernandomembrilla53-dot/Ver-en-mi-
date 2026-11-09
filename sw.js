@@ -1,5 +1,5 @@
 /* Ver en Mi: offline con actualización resiliente y caché acotada. */
-const CACHE="ver-en-mi-v11";
+const CACHE="ver-en-mi-v12";
 const FILES=["./","./index.html","./daily.js","./premium.css","./manifest.json","./icon.svg","./icon-192.png","./icon-512.png","./privacidad.html","./store.css","./store-config.js","./store.js","./assets/producto-01.jpg","./assets/producto-02.jpg","./assets/producto-03.jpg","./assets/producto-04.jpg","./assets/producto-05.jpg","./assets/producto-06.jpg","./assets/producto-07.jpg","./assets/producto-08.jpg","./assets/producto-09.jpg","./assets/producto-10.jpg","./assets/producto-11.jpg","./assets/producto-12.jpg","./assets/producto-13.jpg","./assets/producto-14.jpg","./assets/producto-15.jpg","./assets/producto-16.jpg"];
 const APP_SHELL=new URL("./index.html",self.registration.scope).href;
 self.addEventListener("install",event=>{
