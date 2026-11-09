@@ -1,6 +1,6 @@
 /* Ver en Mi: offline con actualización resiliente y caché acotada. */
-const CACHE="ver-en-mi-v4";
-const FILES=["./","./index.html","./daily.js","./premium.css","./manifest.json","./icon.svg","./icon-192.png","./icon-512.png","./privacidad.html"];
+const CACHE="ver-en-mi-v5";
+const FILES=["./","./index.html","./daily.js","./premium.css","./store.js","./store.css","./store-config.js","./assets/catalogo-yami-16.jpg","./manifest.json","./icon.svg","./icon-192.png","./icon-512.png","./privacidad.html"];
 const APP_SHELL=new URL("./index.html",self.registration.scope).href;
 self.addEventListener("install",event=>{
  event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(FILES)));
