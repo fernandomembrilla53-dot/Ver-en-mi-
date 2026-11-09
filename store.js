@@ -34,9 +34,9 @@ dialog.innerHTML = '<div class="shop-order-top"><h2 id="vem-order-title">Tu pedi
 '<label for="vem-order-qty">Cantidad</label><input id="vem-order-qty" name="cantidad" type="number" min="1" max="20" value="1" required>'+
 '<label for="vem-order-delivery">¿Cómo lo querés recibir?</label><select id="vem-order-delivery" name="entrega"><option value="A coordinar">A coordinar</option><option value="Retiro">Retiro</option><option value="Envío">Envío</option></select>'+
 '<label for="vem-order-notes">Aclaración (opcional)</label><textarea id="vem-order-notes" name="aclaracion" rows="2" maxlength="240" placeholder="Por ejemplo, para qué día lo necesitás"></textarea>'+
-'<p class="shop-order-notice">Al continuar se abrirá WhatsApp con el producto, tu nombre y tu teléfono. Revisá el mensaje y tocá Enviar en WhatsApp para que llegue al comercio.</p>'+
+'<p class="shop-order-notice">Al tocar Enviar por WhatsApp se abrirá el chat del comercio con el pedido preparado. Tocá Enviar dentro de WhatsApp para que se entregue.</p>'+
 '<p id="vem-order-error" role="alert" class="shop-order-error" hidden></p>'+
-'<button type="submit" class="shop-order-submit">Continuar por WhatsApp</button></form>';
+'<button type="submit" class="shop-order-submit">Enviar por WhatsApp</button></form>';
 document.body.append(dialog);
 const form = dialog.querySelector("#vem-order-form");
 const errorBox = dialog.querySelector("#vem-order-error");
