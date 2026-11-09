@@ -101,19 +101,19 @@ form.addEventListener("submit",e => {
  const delivery = String(fd.get("entrega")||"A coordinar");
  const notes = String(fd.get("aclaracion")||"").trim();
  const lines = [
-  "Hola, quiero consultar o pedir un producto de Ver en Mi.",
+  "Hola, quiero hacer un pedido de Ver en Mi.",
   "",
   "Producto: "+chosen.name,
-  "Referencia: "+chosen.code,
-  "Foto: "+chosen.photo,
-  "Cantidad: "+qty,
-  "Nombre: "+(name||"No indicado"),
-  "Mi WhatsApp para responderme: "+phone,
-  "Entrega: "+delivery
+  "Cantidad: "+qty
  ];
- if(chosen.price)lines.push("Precio publicado por unidad: "+money(chosen.price));
+ if(chosen.price)lines.push("Precio por unidad: "+money(chosen.price));
+ // Las fotos del catálogo inicial no tienen nombres propios todavía.
+ // Conservamos su enlace solo en ese caso para que puedan identificarlas.
+ if(!chosen.price && chosen.code.startsWith("FOTO-"))lines.push("Foto elegida: "+chosen.photo);
+ if(name)lines.push("Nombre: "+name);
+ lines.push("Mi WhatsApp: "+phone,"Entrega: "+delivery);
  if(notes)lines.push("Aclaración: "+notes);
- lines.push("","Por favor, confirmame disponibilidad y precio final. ¡Gracias!");
+ lines.push("","¿Me confirmás disponibilidad y precio final? ¡Gracias!");
  dialog.close();
  window.location.assign("https://wa.me/"+destination+"?text="+encodeURIComponent(lines.join("\n")));
 });
