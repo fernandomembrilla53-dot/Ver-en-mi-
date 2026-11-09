@@ -39,7 +39,21 @@ export default {async fetch(req,env){
  if(!env.DB)return error("Base de datos sin configurar",503);
  if(method==="OPTIONS"&&path.startsWith("/api/")&&allowedOrigin(req,env))return new Response(null,{status:204,headers:cors(req,env)});
  if(path==="/admin"&&method==="GET")return new Response(adminPage,{headers:{"content-type":"text/html;charset=utf-8","cache-control":"no-store","X-Frame-Options":"DENY","Referrer-Policy":"no-referrer","X-Content-Type-Options":"nosniff"}});
- if(path==="/api/atlas"&&method==="GET"&&env.APP_ORIGIN)return Response.redirect(env.APP_ORIGIN+"/assets/catalogo-yami-16.svg",302);
+ if(/^\/api\/photos\/[a-z0-9-]+$/.test(path)&&method==="GET"){
+  const id=path.slice("/api/photos/".length);
+  const p=await env.DB.prepare("SELECT photo_key,active FROM products WHERE id=?").bind(id).first();
+  if(!p?.photo_key||!env.FOTOS)return error("Foto no encontrada",404);
+  if(!p.active&&!await isAdmin(req,env))return error("Foto no disponible",404);
+  const obj=await env.FOTOS.get(p.photo_key);
+  if(!obj)return error("Foto no encontrada",404);
+  return new Response(obj.body,{headers:{
+   "content-type":obj.httpMetadata?.contentType||"image/jpeg",
+   "x-content-type-options":"nosniff",
+   "cache-control":p.active?"public,max-age=300":"private,no-store",
+   "access-control-allow-origin":"*",
+   "cross-origin-resource-policy":"cross-origin"
+  }});
+ }
  try{
   if(path==="/api/menu"&&method==="GET"){
    const q=await env.DB.prepare("SELECT * FROM products WHERE active=1 AND available=1 AND name <> '' AND price_ars IS NOT NULL AND price_ars > 0 ORDER BY CASE WHEN featured=1 AND menu_date=? THEN 0 ELSE 1 END, CASE WHEN category='Ensaladas' THEN 0 ELSE 1 END, updated_at DESC LIMIT 200").bind(tzToday()).all();
@@ -82,10 +96,6 @@ export default {async fetch(req,env){
    if(path==="/api/admin/products"&&method==="GET"){
     const q=await env.DB.prepare("SELECT * FROM products ORDER BY COALESCE(photo_index,999), created_at").all();return json({products:q.results||[],today:tzToday()});
    }
-   if(path==="/api/admin/seed"&&method==="POST"){
-    const q=[];for(let i=0;i<16;i++)q.push(env.DB.prepare("INSERT OR IGNORE INTO products(id,name,description,category,price_ars,photo_index,active,available,featured,menu_date,created_at,updated_at) VALUES(?, '', '', 'Por clasificar',NULL,?,0,1,0,'',?,?)").bind("foto-yami-"+String(i+1).padStart(2,"0"),i,new Date().toISOString(),new Date().toISOString()));
-    await env.DB.batch(q);return json({ok:true,count:16});
-   }
    if(path==="/api/admin/products"&&method==="POST"){
     const p=await parseBody(req),id=crypto.randomUUID(),name=bounded(p?.name,100),desc=bounded(p?.description,400),category=bounded(p?.category,45)||"Otros";
     const price=p?.price_ars==null||p.price_ars===""?null:Number(p.price_ars),active=Boolean(p?.active),available=Boolean(p?.available);
@@ -93,6 +103,32 @@ export default {async fetch(req,env){
     const when=Boolean(p?.featured)?tzToday():"";const now=new Date().toISOString();
     await env.DB.prepare("INSERT INTO products(id,name,description,category,price_ars,photo_index,photo_url,active,available,featured,menu_date,created_at,updated_at) VALUES (?,?,?,?,?,NULL,NULL,?,?,?,?,?,?)").bind(id,name,desc,category,price,Number(active),Number(available),Number(Boolean(p?.featured)),when,now,now).run();
     return json({ok:true,id},201);
+   }
+   const uploadMatch=/^\/api\/admin\/products\/([a-z0-9-]+)\/photo$/.exec(path);
+   if(uploadMatch&&method==="POST"){
+    if(!env.FOTOS)return error("Almacenamiento de fotografías sin configurar",503);
+    const id=uploadMatch[1],current=await env.DB.prepare("SELECT id,photo_key FROM products WHERE id=?").bind(id).first();
+    if(!current)return error("Producto no encontrado",404);
+    const size=Number(req.headers.get("content-length")||0);
+    if(size>9*1024*1024)return error("La foto supera el tamaño máximo",413);
+    const form=await req.formData(),file=form.get("photo");
+    if(!(file instanceof File)||file.size<100||file.size>6*1024*1024)return error("Elegí una foto de menos de 6 MB");
+    const mime={"image/jpeg":"jpg","image/png":"png","image/webp":"webp"};
+    const ext=mime[file.type];if(!ext)return error("Solo se admiten fotos JPG, PNG o WebP");
+    const b=new Uint8Array(await file.slice(0,12).arrayBuffer());
+    const jpeg=b[0]===255&&b[1]===216&&b[2]===255;
+    const png=b[0]===137&&b[1]===80&&b[2]===78&&b[3]===71&&b[4]===13&&b[5]===10;
+    const webp=b[0]===82&&b[1]===73&&b[2]===70&&b[3]===70&&b[8]===87&&b[9]===69&&b[10]===66&&b[11]===80;
+    if(!(file.type==="image/jpeg"&&jpeg||file.type==="image/png"&&png||file.type==="image/webp"&&webp))return error("Archivo de imagen inválido");
+    const objectKey="products/"+id+"/"+crypto.randomUUID()+"."+ext;
+    await env.FOTOS.put(objectKey,file.stream(),{httpMetadata:{contentType:file.type}});
+    const photoUrl=url.origin+"/api/photos/"+id+"?v="+Date.now();
+    try {
+     await env.DB.prepare("UPDATE products SET photo_key=?,photo_url=?,photo_index=NULL,updated_at=? WHERE id=?")
+       .bind(objectKey,photoUrl,new Date().toISOString(),id).run();
+    }catch(e){await env.FOTOS.delete(objectKey);throw e;}
+    if(current.photo_key)await env.FOTOS.delete(current.photo_key).catch(()=>{});
+    return json({ok:true,photo_url:photoUrl});
    }
    const match=/^\/api\/admin\/products\/([\w-]+)$/.exec(path);
    if(match&&method==="PUT"){
