@@ -40,3 +40,11 @@ CREATE TABLE IF NOT EXISTS request_limits (
  at_time INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS request_limits_lookup ON request_limits(identity,at_time);
+
+-- Fotos individuales optimizadas para web, guardadas de forma privada en D1
+CREATE TABLE IF NOT EXISTS product_photos (
+ product_id TEXT PRIMARY KEY,
+ content_type TEXT NOT NULL,
+ image_base64 TEXT NOT NULL,
+ updated_at TEXT NOT NULL
+);
