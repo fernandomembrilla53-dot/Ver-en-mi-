@@ -28,7 +28,7 @@ dialog.setAttribute("aria-labelledby","vem-order-title");
 dialog.innerHTML = '<div class="shop-order-top"><h2 id="vem-order-title">Tu pedido</h2><button type="button" class="shop-order-close" aria-label="Cerrar">×</button></div><p class="shop-order-welcome">Gracias por elegirnos 😊❤️, dejame tu número de teléfono así te contesto.</p>'+
 '<div class="shop-order-choice"><img id="vem-order-preview" alt="Foto del producto elegido"><div><strong id="vem-order-selected"></strong><p id="vem-order-price">Consultá precio y disponibilidad</p></div></div>'+
 '<form id="vem-order-form">'+
-'<label for="vem-order-name">Tu nombre</label><input id="vem-order-name" name="nombre" type="text" autocomplete="name" maxlength="80" required placeholder="Nombre y apellido">'+
+'<label for="vem-order-name">Tu nombre (opcional)</label><input id="vem-order-name" name="nombre" type="text" autocomplete="name" maxlength="80" placeholder="¿Cómo te llamás?">'+
 '<label for="vem-order-phone">Tu número de WhatsApp</label><input id="vem-order-phone" name="telefono" type="tel" inputmode="tel" autocomplete="tel" maxlength="24" required placeholder="Ej.: 2494 123456">'+
 '<p class="shop-order-help">Incluí el código de área para que podamos responderte.</p>'+
 '<label for="vem-order-qty">Cantidad</label><input id="vem-order-qty" name="cantidad" type="number" min="1" max="20" value="1" required>'+
@@ -88,8 +88,8 @@ form.addEventListener("submit",e => {
  const phone = String(fd.get("telefono")||"").trim();
  const digits = phone.replace(/\D/g,"");
  const qty = Number(fd.get("cantidad"));
- if(!name || digits.length<8 || digits.length>15) {
-  errorBox.textContent="Escribí un nombre y un número de WhatsApp válido, con código de área.";
+ if(digits.length<8 || digits.length>15) {
+  errorBox.textContent="Escribí un número de WhatsApp válido, con código de área.";
   errorBox.hidden=false;
   return;
  }
@@ -107,7 +107,7 @@ form.addEventListener("submit",e => {
   "Referencia: "+chosen.code,
   "Foto: "+chosen.photo,
   "Cantidad: "+qty,
-  "Nombre: "+name,
+  "Nombre: "+(name||"No indicado"),
   "Mi WhatsApp para responderme: "+phone,
   "Entrega: "+delivery
  ];
