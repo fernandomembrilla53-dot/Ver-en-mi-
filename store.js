@@ -25,7 +25,7 @@ mount.append(live);
 const dialog = document.createElement("dialog");
 dialog.className = "shop-order-dialog";
 dialog.setAttribute("aria-labelledby","vem-order-title");
-dialog.innerHTML = '<div class="shop-order-top"><h2 id="vem-order-title">Consultar producto</h2><button type="button" class="shop-order-close" aria-label="Cerrar">×</button></div>'+
+dialog.innerHTML = '<div class="shop-order-top"><h2 id="vem-order-title">Tu pedido</h2><button type="button" class="shop-order-close" aria-label="Cerrar">×</button></div><p class="shop-order-welcome">Gracias por elegirnos 😊❤️, dejame tu número de teléfono así te contesto.</p>'+
 '<div class="shop-order-choice"><img id="vem-order-preview" alt="Foto del producto elegido"><div><strong id="vem-order-selected"></strong><p id="vem-order-price">Consultá precio y disponibilidad</p></div></div>'+
 '<form id="vem-order-form">'+
 '<label for="vem-order-name">Tu nombre</label><input id="vem-order-name" name="nombre" type="text" autocomplete="name" maxlength="80" required placeholder="Nombre y apellido">'+
