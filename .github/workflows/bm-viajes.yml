@@ -1,0 +1,28 @@
+name: BM Viajes - Validacion automatica
+on:
+  push:
+    paths:
+      - "bm-viajes/**"
+      - ".github/workflows/bm-viajes.yml"
+  pull_request:
+    paths:
+      - "bm-viajes/**"
+      - ".github/workflows/bm-viajes.yml"
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Revisar sintaxis
+        run: |
+          node --check bm-viajes/enhancements.js
+          node --check bm-viajes/pilot.js
+          node --check bm-viajes/sw.js
+          node --check bm-viajes/backend/worker.mjs
+      - name: Verificar app y API
+        run: node --test bm-viajes/tests/*.test.mjs
