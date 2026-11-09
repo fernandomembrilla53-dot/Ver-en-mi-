@@ -1,0 +1,36 @@
+{
+  "name": "BM Viajes | Movilidad local",
+  "short_name": "BM Viajes",
+  "description": "Demo interactiva de movilidad para Ayacucho. Mapas y GPS voluntario, sin reservas ni cobros reales.",
+  "lang": "es-AR",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
+  "orientation": "any",
+  "background_color": "#f4f6f8",
+  "theme_color": "#101b29",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Pedir viaje (demo)",
+      "short_name": "Pasajero",
+      "url": "./#inicio"
+    },
+    {
+      "name": "Panel de conductor (demo)",
+      "short_name": "Conductor",
+      "url": "./#conductor"
+    }
+  ]
+}
