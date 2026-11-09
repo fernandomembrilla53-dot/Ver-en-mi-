@@ -1,4 +1,4 @@
-export const adminPage = \`<!doctype html>
+export const adminPage = `<!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Ver en Mí · Panel de Yami</title>
 <style>
 *{box-sizing:border-box}body{margin:0;background:#f5f8f3;color:#1c3e31;font-family:system-ui,Arial,sans-serif}header{background:linear-gradient(130deg,#174c39,#2c8661);color:white;padding:22px 18px}header h1{margin:0;font-size:26px}main{max-width:1050px;margin:auto;padding:14px}
@@ -80,4 +80,4 @@ $("notifications").onclick=async()=>{if("Notification" in window){const p=await 
 $("logout").onclick=async()=>{try{await api("/api/admin/logout","POST",{})}catch(_){}location.reload()};
 setInterval(()=>{if(!$("app").classList.contains("hidden")&&!document.hidden)loadOrders().catch(()=>{})},30000);
 refresh().then(()=>{$("login").classList.add("hidden");$("app").classList.remove("hidden")}).catch(()=>{});
-</script></body></html>\`;
+</script></body></html>`;
