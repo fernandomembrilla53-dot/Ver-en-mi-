@@ -17,7 +17,7 @@ const first=section.querySelector(".card");if(first)first.after(panel);else sect
 let products=[],cart=new Map();
 const status=(message,isError=false)=>{content.innerHTML='<p class="'+(isError?'shop-error':'muted')+'">'+esc(message)+'</p>';cartBox.hidden=true;};
 if(!API){status("El catálogo se está preparando. Todavía no hay productos ni precios publicados.");return;}
-const api=(path,opts={})=>fetch(API+path,{...opts,headers:{"Content-Type":"application/json",...(opts.headers||{})}}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||"No se pudo conectar");return d});
+const api=(path,opts={})=>fetch(API+path,{cache:"no-store",...opts,headers:{"Content-Type":"application/json",...(opts.headers||{})}}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||"No se pudo conectar");return d});
 const compare=(a,b)=>Number(b.featured)-Number(a.featured)||(a.category==="Ensaladas"?-1:b.category==="Ensaladas"?1:0)||a.name.localeCompare(b.name,"es");
 function draw(){
  content.replaceChildren();const list=document.createElement("div");list.className="shop-grid";
@@ -51,12 +51,12 @@ function drawCart(){
  const form=document.createElement("form");form.innerHTML='<label>Nombre <input name="nombre" required maxlength="100" autocomplete="name"></label><label>Teléfono <input name="telefono" required maxlength="30" type="tel" autocomplete="tel"></label><label>Entrega <select name="entrega"><option value="retiro">Retiro a coordinar</option><option value="envio">Envío a coordinar</option></select></label><label>Dirección (solo si pedís envío) <input name="direccion" maxlength="180"></label><label>Indicaciones (opcional) <textarea name="notas" maxlength="300" rows="2"></textarea></label><button type="submit">Enviar pedido a Yami</button><p class="muted">La compra queda solicitada. Yami confirmará disponibilidad, entrega y pago.</p>';
  const msg=document.createElement("p");msg.setAttribute("role","status");form.append(msg);
  form.onsubmit=async e=>{e.preventDefault();const fd=new FormData(form),button=form.querySelector("button[type=submit]");button.disabled=true;msg.textContent="Enviando…";
- try{const payload={name:fd.get("nombre"),phone:fd.get("telefono"),delivery:fd.get("entrega"),address:fd.get("direccion"),notes:fd.get("notas"),items:[...cart].map(([id,quantity])=>({id,quantity}))};
+ try{const payload={name:fd.get("nombre"),phone:fd.get("telefono"),delivery:fd.get("entrega"),address:fd.get("direccion"),notes:fd.get("notas"),quoted_total_ars:total,items:[...cart].map(([id,quantity])=>({id,quantity}))};
  const result=await api("/api/orders",{method:"POST",body:JSON.stringify(payload)});
  cart.clear();drawCart();const ok=document.createElement("p");ok.className="shop-success";ok.setAttribute("role","status");ok.textContent="Pedido #"+result.order_id+" registrado. Yami lo confirmará.";cartBox.append(ok);
  }catch(err){msg.className="shop-error";msg.textContent=err.message;button.disabled=false;}};
  cartBox.append(form);
 }
 async function reload(){try{const data=await api("/api/menu");products=Array.isArray(data.products)?data.products.filter(p=>Number.isSafeInteger(p.price_ars)&&p.price_ars>=0):[];draw()}catch(e){status("No se pudo cargar la tienda. Probá de nuevo cuando tengas conexión.",true);}}
-reload();document.addEventListener("visibilitychange",()=>{if(!document.hidden)reload()});
+reload();document.addEventListener("visibilitychange",()=>{if(!document.hidden)reload()});window.addEventListener("focus",reload);setInterval(()=>{if(!document.hidden)reload()},120000);
 })();
