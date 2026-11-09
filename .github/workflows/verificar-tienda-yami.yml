@@ -11,6 +11,12 @@ on:
       - 'privacidad.html'
       - '.github/workflows/verificar-tienda-yami.yml'
   workflow_dispatch:
+    inputs:
+      publicar:
+        description: 'Publicar Worker en Cloudflare después de las pruebas'
+        type: boolean
+        required: true
+        default: false
 permissions:
   contents: read
 jobs:
@@ -137,3 +143,60 @@ jobs:
                   print(path, "no verificado:", type(exc).__name__, str(exc)[:160])
                   raise
           PY
+
+  desplegar:
+    name: Publicar tienda en Cloudflare (manual)
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publicar == true }}
+    needs: verificar
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    concurrency:
+      group: ver-en-mi-tienda-production
+      cancel-in-progress: false
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: d41d328f1e8a9ba2131aba8b57923f2a
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verificar credenciales y destino
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo "Falta CLOUDFLARE_API_TOKEN"; exit 1; }
+          node <<'JS'
+          const fs=require('node:fs');
+          const cfg=fs.readFileSync('wrangler.toml','utf8');
+          if(!cfg.includes('name = "ver-en-mi-tienda"'))throw Error('Worker incorrecto');
+          if(!cfg.includes('database_id = "fddadd94-6c4b-4142-9b65-833ce068cc84"'))throw Error('D1 incorrecta');
+          if(!cfg.includes('binding = "DB"'))throw Error('Binding DB ausente');
+          console.log('Destino y base D1 configurados.');
+          JS
+      - name: Instalar Wrangler
+        run: npm install --no-save --no-package-lock wrangler@4
+      - name: Compilar sin publicar
+        run: npx wrangler deploy --dry-run --keep-vars
+      - name: Publicar Worker conservando variables existentes
+        run: npx wrangler deploy --keep-vars
+      - name: Verificar rutas publicadas
+        run: |
+          node <<'JS'
+          (async()=>{
+            const base='https://ver-en-mi-tienda.fernandomembrilla53.workers.dev';
+            const origin='https://fernandomembrilla53-dot.github.io';
+            const admin=await fetch(base+'/admin',{cache:'no-store'});
+            const html=await admin.text();
+            if(admin.status!==200||!html.includes('Tienda de Yami'))throw Error('El panel de Yami no responde');
+            const menu=await fetch(base+'/api/menu',{headers:{Origin:origin},cache:'no-store'});
+            if(menu.status!==200)throw Error('El menú no responde: '+menu.status);
+            const data=await menu.json();
+            if(!Array.isArray(data.products))throw Error('Menú inválido');
+            if(menu.headers.get('access-control-allow-origin')!==origin)throw Error('CORS inválido');
+            const unauth=await fetch(base+'/api/admin/products');
+            if(unauth.status!==401)throw Error('Panel no protegido');
+            console.log('Panel, catálogo, CORS y protección: OK. Productos visibles: '+data.products.length);
+          })().catch(e=>{console.error(e.message);process.exitCode=1});
+          JS
