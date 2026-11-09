@@ -12,7 +12,7 @@ const intro=document.createElement("div");
 intro.innerHTML='<div class="shop-featured">VER EN MÍ · LO SIMPLE DE COMER BIEN</div><h2>Productos caseros</h2><p class="muted">Ensaladas frescas y otras preparaciones del día. Fotos reales de nuestras preparaciones. Consultá disponibilidad y precios cuando se publiquen.</p>';
 const content=document.createElement("div");
 const cartBox=document.createElement("div");cartBox.className="shop-cart";
-const gallery=document.createElement("section");
+const gallery=document.createElement("div");
 gallery.className="shop-photo-preview";
 gallery.setAttribute("aria-label","Galería de fotografías de productos");
 gallery.innerHTML='<div class="shop-photo-preview-head"><h3>Galería de productos</h3><p>Fotografías de nuestros productos. Los precios y la disponibilidad se publicarán próximamente.</p></div>';
