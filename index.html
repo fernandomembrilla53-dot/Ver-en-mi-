@@ -68,6 +68,7 @@ button.secondary{background:#fff;color:#176b4d;border:1px solid #176b4d;border-r
 </style>
 <link rel="stylesheet" href="./premium.css">
 <link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="./store.css">
 </head>
 <body>
 <header class="hero-header">
@@ -409,6 +410,8 @@ $('avisoPlan').textContent='Objetivo: '+(perfilPlan.objetivo||'mejorar hábitos'
 cargarPerfil();cargarHabitos();cargarRutina();mostrarHistorial();
 </script>
 <script src="./daily.js"></script>
+<script src="./store-config.js"></script>
+<script src="./store.js"></script>
 <script>
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js"));
