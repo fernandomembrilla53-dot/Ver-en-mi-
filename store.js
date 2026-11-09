@@ -19,10 +19,10 @@ gallery.innerHTML='<div class="shop-photo-preview-head"><h3>Galería de producto
 const tiles=document.createElement("div");tiles.className="shop-preview-grid";
 for(let i=0;i<16;i++){
  const tile=document.createElement("figure");tile.className="shop-preview-tile";
- const photo=document.createElement("div");photo.className="shop-preview-image";
- const x=(i%4)*100/3,y=Math.floor(i/4)*100/3;
- photo.style.backgroundPosition=x+"% "+y+"%";
- photo.setAttribute("role","img");photo.setAttribute("aria-label","Fotografía de producto "+(i+1));
+ const photo=document.createElement("img");photo.className="shop-preview-image";
+ photo.src="./assets/producto-"+String(i+1).padStart(2,"0")+".jpg";
+ photo.loading=i<4?"eager":"lazy";photo.decoding="async";
+ photo.alt="Fotografía real de producto "+(i+1);
  const cap=document.createElement("figcaption");cap.textContent="Producto "+String(i+1).padStart(2,"0");
  tile.append(photo,cap);tiles.append(tile);
 }
