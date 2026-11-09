@@ -4,11 +4,50 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#101b29">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <meta name="description" content="BM Viajes: prototipo interactivo de movilidad para Ayacucho. Vista previa con viajes y pagos simulados.">
 <title>BM Viajes | Vista previa interactiva</title>
 <style>
 :root{--ink:#102031;--ink2:#1a3043;--gold:#ffca67;--amber:#f1aa37;--mint:#b8efda;--white:#fff;--sub:#a7b7c6;--line:rgba(255,255,255,.13);--paper:#f4f6f8;--shadow:0 24px 55px rgba(12,24,38,.15);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
 *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--paper);color:var(--ink);font-size:15px}button,input,select{font:inherit}button{cursor:pointer}button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #ffb23f;outline-offset:3px}button:disabled{opacity:.5;cursor:not-allowed}a{text-decoration:none;color:inherit}.page{min-height:100vh}.top{background:linear-gradient(120deg,#101d2c,#1a3042 70%,#274053);color:white;padding:18px clamp(17px,5vw,72px) 124px;position:relative;overflow:hidden}.top:before{content:"";position:absolute;width:460px;height:460px;border-radius:50%;background:radial-gradient(circle,rgba(242,166,52,.18),transparent 65%);right:-100px;top:-260px;pointer-events:none}.nav{max-width:1200px;margin:auto;display:flex;align-items:center;justify-content:space-between;gap:14px}.logo{display:flex;align-items:center;gap:10px;font-weight:900;letter-spacing:-.9px;font-size:20px}.logo-mark{width:39px;height:39px;display:grid;place-items:center;background:var(--gold);border-radius:12px;color:#152333;font-size:18px;box-shadow:0 5px 15px rgba(255,202,103,.16)}.nav-right{display:flex;align-items:center;gap:8px;font-size:12px}.tag{border:1px solid #ffffff3d;background:#ffffff10;border-radius:100px;padding:9px 12px;color:#fff}.warn-tag{background:#f6bd512b;color:#ffdb9f;border-color:#eebc5e68}.hero{max-width:1200px;margin:70px auto 0;display:flex;justify-content:space-between;align-items:center;gap:25px}.hero-copy{max-width:660px}.eyebrow{display:inline-flex;align-items:center;gap:8px;color:#ffd996;font-weight:800;text-transform:uppercase;letter-spacing:2px;font-size:11px}.dot{width:7px;height:7px;border-radius:50%;background:var(--gold);display:inline-block}.hero h1{font-size:clamp(39px,6vw,72px);letter-spacing:-3px;line-height:1.02;margin:17px 0 16px;font-weight:900}.hero h1 em{font-style:normal;color:var(--gold)}.hero p{color:#c6d1db;line-height:1.7;font-size:16px;max-width:540px;margin:0}.hero-art{width:240px;height:160px;position:relative;flex-shrink:0}.hero-art .orb{position:absolute;width:190px;height:190px;border:1px dashed #ffffff33;border-radius:50%;top:-18px;left:32px}.hero-art .car{position:absolute;top:42px;left:0;font-size:90px;filter:drop-shadow(0 18px 25px #0007);transform:rotate(-8deg)}.hero-art .bubble{position:absolute;right:3px;top:-6px;background:var(--mint);color:#102333;padding:10px 13px;border-radius:15px;font-weight:800;font-size:12px;box-shadow:0 8px 35px #0004}.workspace{max-width:1200px;margin:-89px auto 0;padding:0 22px 80px;position:relative}.tabs{display:flex;gap:6px;align-items:center;width:max-content;background:white;padding:6px;border-radius:16px 16px 0 0;box-shadow:0 -6px 25px rgba(0,0,0,.04)}.tabs button{border:0;border-radius:11px;padding:12px 20px;background:transparent;font-weight:800;color:#637487;display:flex;align-items:center;gap:8px}.tabs button.active{background:#17293a;color:white}.main{display:grid;grid-template-columns:minmax(320px,.8fr) minmax(0,1.2fr);box-shadow:var(--shadow);border-radius:0 23px 23px 23px;background:white;overflow:hidden;min-height:540px}.formside{padding:clamp(23px,4vw,40px);background:#fff;position:relative}.section-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;gap:12px}.section-head h2{font-size:24px;letter-spacing:-.8px;margin:0}.step{font-size:11px;color:#718195;font-weight:900;background:#eef2f5;border-radius:100px;padding:7px 10px;white-space:nowrap}.subhead{font-size:13px;color:#718195;line-height:1.55;margin:-13px 0 24px}.field{margin:0 0 17px}.field label{display:block;font-size:12px;font-weight:800;color:#40546b;margin-bottom:8px}.input-wrap{display:flex;align-items:center;gap:9px;border:1px solid #dfe6ec;border-radius:12px;background:#fbfcfd;padding:0 13px;transition:.15s}.input-wrap:focus-within{border-color:#e7aa52;box-shadow:0 0 0 3px #ffca6733}.pin{height:11px;width:11px;border:3px solid #3c816f;border-radius:50%;flex-shrink:0}.pin.end{border-color:#f0a135;border-radius:3px;transform:rotate(45deg)}input,select{width:100%;border:0;outline:0;background:transparent;padding:15px 0;min-width:0;color:#1e2f43}select{appearance:auto}.swap{border:0;color:#34475a;background:#edf1f3;border-radius:10px;padding:9px 11px;font-size:12px;font-weight:800;margin:0 0 16px;display:inline-block}.services{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin:8px 0 22px}.svc{border:1.5px solid #e1e6eb;background:#fff;border-radius:14px;text-align:left;padding:14px 9px;min-width:0;transition:.2s}.svc.selected{border-color:#e4a444;background:#fff7e9;box-shadow:inset 0 0 0 1px #e4a444}.svc .emoji{font-size:24px;display:block;margin-bottom:9px}.svc b,.svc small{display:block}.svc b{font-size:12px;white-space:nowrap}.svc small{font-size:10px;color:#7b8797;margin-top:5px}.farebox{background:#f6f8fa;border:1px solid #e9edf0;padding:16px;border-radius:15px;margin:12px 0 19px}.split{display:flex;justify-content:space-between;align-items:center;gap:9px;margin:8px 0}.split span{color:#64778b;font-size:12px}.split strong{font-size:12px}.split.total{padding-top:12px;border-top:1px solid #dfe6ea;margin-top:14px}.split.total strong{font-size:28px;letter-spacing:-1px;color:#162a3c}.method{display:flex;gap:9px;margin:0 0 18px;flex-wrap:wrap}.method label{display:flex;align-items:center;gap:5px;border:1px solid #dce3ea;border-radius:11px;padding:9px 12px;font-size:12px;font-weight:700;color:#496078;cursor:pointer}.method input{width:auto;accent-color:#182d40}.cta{display:block;width:100%;border:0;border-radius:13px;background:var(--gold);color:#15283a;font-weight:900;padding:16px 18px;box-shadow:0 8px 20px #e7ab4c31;transition:transform .17s,background .17s}.cta:hover{background:#f7b943;transform:translateY(-1px)}.secondary{display:block;border:1px solid #cad5dc;border-radius:12px;background:#fff;color:#20374b;font-weight:800;padding:12px 14px}.fine{font-size:10px;color:#8996a4;line-height:1.6;margin:13px 0 0}.map-panel{min-height:530px;position:relative;background:#e7eeeb;overflow:hidden}.map-panel svg{position:absolute;inset:0;width:100%;height:100%}.map-grain{position:absolute;inset:0;pointer-events:none;background:linear-gradient(135deg,#ffffff25,transparent 55%)}.map-top{position:absolute;top:23px;left:22px;right:22px;display:flex;justify-content:space-between;align-items:flex-start;gap:10px}.location{background:#fff;padding:11px 13px;border-radius:12px;box-shadow:0 9px 25px #18322717;display:flex;align-items:center;gap:8px;font-size:12px;font-weight:900}.map-label{background:#172c3ee0;color:#fff;padding:8px 10px;border-radius:8px;font-size:10px;font-weight:750}.bottom-map{position:absolute;bottom:20px;left:21px;right:21px;display:flex;align-items:flex-end;justify-content:space-between;gap:10px}.map-tip{background:#ffffffea;box-shadow:0 9px 35px #0002;border-radius:13px;padding:13px 15px;max-width:300px}.map-tip strong{display:block;font-size:12px}.map-tip p{font-size:11px;line-height:1.5;color:#607184;margin:5px 0 0}.map-mini{background:white;border-radius:11px;padding:9px 12px;font-size:11px;font-weight:800;white-space:nowrap;box-shadow:0 9px 35px #0002}.trip-state{border:1px solid #dce9e4;border-radius:18px;padding:20px;background:#f4fbf8}.trip-state .status{font-size:13px;font-weight:900;color:#31735f;margin-bottom:10px}.trip-state h3{font-size:20px;margin:0 0 7px}.trip-state p{font-size:13px;color:#576c79;line-height:1.55}.trip-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.driver-wrap{padding:25px;background:#f2f6f6;border-radius:17px}.driver-card{background:white;border:1px solid #e0e8e6;border-radius:14px;padding:18px;margin-top:14px}.driver-head{display:flex;align-items:center;gap:10px}.avatar{display:grid;place-items:center;background:#fce5ae;color:#4a3621;font-size:20px;width:49px;height:49px;border-radius:15px;font-weight:900}.pill{font-size:10px;background:#e3f7ec;color:#286a4c;padding:6px 9px;border-radius:30px;font-weight:900;display:inline-block}.value{font-weight:900;font-size:28px;letter-spacing:-1px}.driver-metrics{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0}.metric{border:1px solid #e6edf0;background:#f8fafb;padding:13px;border-radius:12px}.metric span{display:block;color:#708293;font-size:11px}.metric strong{display:block;margin-top:7px;font-size:19px}.line{height:1px;background:#e4e9ec;margin:18px 0}.driver-note{font-size:12px;color:#687e8b;line-height:1.6}.notice{font-size:12px;color:#6a7887;background:#fff6e4;border:1px solid #f5dfb3;padding:12px 14px;border-radius:12px;margin:18px 0}.review{display:flex;gap:7px;margin-top:9px}.star{border:0;background:#edf2f5;border-radius:8px;padding:8px 11px;font-size:20px;color:#95a1a9}.star.on{color:#e7a02a;background:#fff2d8}.footer{max-width:1200px;margin:0 auto;padding:0 22px 35px;display:flex;justify-content:space-between;gap:15px;color:#8190a0;font-size:12px;flex-wrap:wrap}.hidden{display:none!important}.toast{position:fixed;bottom:24px;left:50%;transform:translate(-50%,20px);z-index:99;opacity:0;pointer-events:none;background:#142d40;color:#fff;border-radius:14px;padding:12px 18px;font-size:12px;font-weight:800;box-shadow:0 10px 35px #0003;transition:.24s}.toast.show{opacity:1;transform:translate(-50%,0)}@media(max-width:850px){.hero-art{display:none}.hero{margin-top:45px}.top{padding-bottom:121px}.main{grid-template-columns:1fr}.map-panel{min-height:320px;order:-1}.formside{order:1}.hero h1{letter-spacing:-2px}.workspace{margin-top:-82px}.bottom-map{bottom:12px}.map-tip{max-width:210px}}@media(max-width:500px){.top{padding:15px 17px 115px}.nav-right .tag:first-child{display:none}.hero{margin-top:37px}.hero h1{font-size:43px}.hero p{font-size:14px}.workspace{padding:0 12px 52px}.tabs button{padding:12px 15px;font-size:12px}.formside{padding:23px 19px}.section-head h2{font-size:21px}.map-panel{min-height:270px}.services{gap:6px}.svc{padding:12px 7px}.svc b{font-size:11px}.map-top{top:12px;left:12px;right:12px}.bottom-map{left:12px;right:12px}.map-tip{max-width:210px;padding:10px}.map-mini{display:none}.footer{padding:0 20px 25px}}@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+/* Mejoras: panel de movilidad, GPS opcional y mapa real con capa de respaldo */
+[hidden]{display:none!important}
+.bm-toolbox{background:#fff;border:1px solid #e7edf1;border-radius:0 18px 18px 18px;padding:17px 19px;margin-bottom:14px;box-shadow:0 12px 30px #10203112}
+.bm-toolbar-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.bm-toolbar-head strong{font-size:14px;color:#173047}
+.bm-online{font-size:11px;font-weight:800;padding:7px 10px;border-radius:100px;background:#dff6eb;color:#166a4d}
+.bm-online[data-online=false]{background:#fff0df;color:#986422}
+.bm-controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:12px}
+.bm-controls button,.bm-extra button{border:1px solid #dae3e8;background:#f8fbfc;color:#19354a;border-radius:11px;min-height:43px;padding:10px 13px;font-size:12px;font-weight:850}
+.bm-controls button:hover,.bm-extra button:hover{background:#fff4de;border-color:#eeb954}
+.bm-controls button[aria-pressed=true]{background:#ffe2a9;border:2px solid #df9d28}
+.bm-controls .bm-gps{background:#102d42;color:#fff;border-color:#102d42}
+.bm-controls .bm-install{background:#f4b74c;color:#192d3d;border-color:#f4b74c}
+.bm-more{margin-top:11px;border-top:1px solid #e9edf0;padding-top:11px}
+.bm-more summary{color:#345268;font-weight:800;font-size:12px;cursor:pointer}
+.bm-extra{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}
+.bm-status{color:#587185;font-size:12px;line-height:1.55;margin:10px 0 0;min-height:18px}
+.map-panel{isolation:isolate}
+#interactive-map{position:absolute;inset:0;width:100%;height:100%;z-index:1;background:#dce8de}
+.map-panel:not(.has-live-map) #interactive-map{display:none}
+.map-panel.has-live-map>svg,.map-panel.has-live-map>.map-grain,.map-panel.has-live-map .bottom-map{display:none}
+.map-panel .map-top{z-index:510;pointer-events:none}
+.map-panel .map-top>*{pointer-events:none}
+.map-panel.has-live-map .map-label{background:#152d3edc}
+.leaflet-container{font-family:inherit}
+.bm-pin-wrap{background:transparent;border:0}
+.bm-pin{display:grid;place-items:center;color:#fff;font-weight:900;font-size:11px;background:#1a755a;border:3px solid white;border-radius:50% 50% 50% 6px;width:36px;height:36px;transform:rotate(-45deg);box-shadow:0 4px 11px #0005}
+.bm-pin.origin{background:#1c8b61}.bm-pin.destination{background:#de9b24}.bm-pin.me{background:#237dbb;font-size:10px}
+.leaflet-control-attribution{font-size:9px!important}
+.bm-disclaimer{padding:13px 16px;border:1px solid #f3dfaa;border-radius:12px;background:#fff8e8;color:#6b5730;font-size:12px;line-height:1.6;margin:0 0 15px}
+@media(max-width:600px){.bm-toolbox{padding:14px;border-radius:0 12px 12px 12px}.bm-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.bm-controls button{padding:10px 6px;font-size:11px}.map-panel .map-top{left:9px;right:9px;top:9px}.map-top .location{font-size:10px;padding:7px}.map-top .map-label{font-size:9px;padding:7px}}
 </style>
 </head>
 <body>
@@ -32,7 +71,26 @@
       <button id="tab-passenger" class="active" type="button" role="tab" aria-selected="true">◉ Pasajero</button>
       <button id="tab-driver" type="button" role="tab" aria-selected="false">◈ Conductor</button>
     </div>
-    <div class="main">
+    <section class="bm-toolbox" aria-label="Herramientas de BM Viajes">
+  <div class="bm-toolbar-head"><strong>Tu viaje, bajo control</strong><span class="bm-online" id="connection-status" role="status">Comprobando conexión</span></div>
+  <div class="bm-controls">
+    <button type="button" class="bm-gps" id="get-gps">Usar GPS con permiso</button>
+    <button type="button" id="map-pick-origin" aria-pressed="false">Marcar partida en mapa</button>
+    <button type="button" id="map-pick-dest" aria-pressed="false">Marcar destino en mapa</button>
+    <button type="button" class="bm-install" id="install-app">Instalar BM Viajes</button>
+  </div>
+  <p class="bm-status" id="gps-status" role="status" aria-live="polite">La ubicación es opcional y queda en tu celular. Los precios y pedidos siguen siendo de demostración.</p>
+  <details class="bm-more"><summary>Más herramientas: compartir, favoritos y privacidad</summary><div class="bm-extra">
+    <button type="button" id="use-gps-origin" disabled>Usar mi GPS como origen</button>
+    <button type="button" id="share-location" disabled>Compartir mi posición voluntariamente</button>
+    <button type="button" id="stop-gps">Borrar mi posición</button>
+    <button type="button" id="share-trip">Compartir esta demo</button>
+    <button type="button" id="save-favorite">Guardar recorrido</button>
+    <button type="button" id="load-favorite">Cargar favorito</button>
+  </div></details>
+</section>
+<p class="bm-disclaimer"><strong>Versión de prueba:</strong> el mapa y el GPS pueden ser reales, pero todavía no se asignan conductores, no hay seguimiento entre celulares ni pagos o viajes reales. No uses esta demo para solicitar transporte o emergencias.</p>
+<div class="main">
       <div class="formside">
         <div id="passenger-panel">
           <div class="section-head"><h2 id="form-title">¿Adónde vamos?</h2><span class="step">VISTA PREVIA</span></div>
@@ -57,7 +115,7 @@
               <label><input type="radio" name="payment" value="Mercado Pago (simulado)">Mercado Pago*</label>
             </div></div>
             <button id="order" type="button" class="cta">Simular pedido de viaje →</button>
-            <p class="fine">* No se realizan cobros reales, no se solicita ubicación GPS ni se contacta a conductores. Valores no oficiales de prueba.</p>
+            <p class="fine">* No se realizan cobros reales, el GPS es optativo y queda en tu dispositivo ni se contacta a conductores. Valores no oficiales de prueba.</p>
           </div>
           <div id="trip-detail" class="hidden" aria-live="polite">
             <div class="trip-state">
@@ -85,7 +143,8 @@
           <div class="notice">El panel no registra conductores reales, no verifica documentación y no procesa cobros. La comisión es un supuesto del prototipo.</div>
         </div>
       </div>
-      <aside class="map-panel" aria-label="Mapa decorativo ilustrativo. No representa rutas reales.">
+      <aside class="map-panel" aria-label="Mapa interactivo de Ayacucho cuando hay conexión; mapa ilustrativo como respaldo.">
+        <div id="interactive-map" role="application" aria-label="Mapa interactivo de OpenStreetMap"></div>
         <svg viewBox="0 0 720 660" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Ilustración estilizada de calles de una ciudad y un trayecto con un auto">
           <defs><pattern id="blocks" width="105" height="100" patternUnits="userSpaceOnUse"><rect width="105" height="100" fill="#e8eee9"/><rect x="9" y="9" width="76" height="74" rx="10" fill="#d9e4db"/><rect x="22" y="21" width="20" height="28" rx="3" fill="#c4d5ca"/><rect x="47" y="22" width="30" height="40" rx="3" fill="#cbdacb"/></pattern><filter id="sh"><feDropShadow dx="0" dy="8" stdDeviation="9" flood-opacity=".18"/></filter></defs>
           <rect width="720" height="660" fill="url(#blocks)"/><g transform="rotate(-15 360 330)"><path d="M-200 205H1000M-200 420H1000" stroke="#fff" stroke-width="39"/><path d="M210 -200V950M490 -200V950M630 -200V950" stroke="#fff" stroke-width="38"/><path d="M-200 205H1000M-200 420H1000M210 -200V950M490 -200V950M630 -200V950" stroke="#c2cec8" stroke-width="1.5" stroke-dasharray="10 13"/></g>
@@ -97,7 +156,7 @@
           <g transform="translate(535 523)"><rect width="102" height="80" rx="16" fill="#c6d7c3"/><circle cx="28" cy="25" r="15" fill="#93b49c"/><circle cx="64" cy="45" r="23" fill="#91b29b"/></g>
         </svg>
         <div class="map-grain"></div>
-        <div class="map-top"><div class="location"><span style="color:#dfab52;font-size:18px">⌖</span> Ayacucho <span style="color:#8da1ad;font-weight:600">· Buenos Aires</span></div><span class="map-label">Mapa ilustrativo</span></div>
+        <div class="map-top"><div class="location"><span style="color:#dfab52;font-size:18px">⌖</span> Ayacucho <span style="color:#8da1ad;font-weight:600">· Buenos Aires</span></div><span class="map-label">Mapa interactivo</span></div>
         <div class="bottom-map"><div class="map-tip"><strong>Una forma nueva de moverte</strong><p>Solicitudes, elección de vehículo, seguimiento y perfil de conductor en una única experiencia.</p></div><span class="map-mini">◈ BM Viajes · Beta</span></div>
       </aside>
     </div>
@@ -114,7 +173,7 @@ var $=function(id){return document.getElementById(id);};
 var money=function(n){return "$ "+Math.round(n).toLocaleString("es-AR");};
 var toastTimer;
 function toast(msg){$("toast").textContent=msg;$("toast").classList.add("show");clearTimeout(toastTimer);toastTimer=setTimeout(function(){$("toast").classList.remove("show");},2900);}
-function kmFor(a,b){var named=["Plaza San Martín","Terminal de Ómnibus","Hospital Municipal","Estación de Tren","Zona de Quintas","Barrio La Feria","Parque Municipal"];var i=named.indexOf(a),j=named.indexOf(b);if(i<0||j<0)return 3.2;return Number((1.4+Math.abs(i-j)*.78+((i+j)%3)*.37).toFixed(1));}
+function kmFor(a,b){if(window.BMGeo&&window.BMGeo.hasRoute()){var air=window.BMGeo.routeDistanceKm();if(Number.isFinite(air))return Math.max(.1,air);}var named=["Plaza San Martín","Terminal de Ómnibus","Hospital Municipal","Estación de Tren","Zona de Quintas","Barrio La Feria","Parque Municipal"];var i=named.indexOf(a),j=named.indexOf(b);if(i<0||j<0)return 3.2;return Number((1.4+Math.abs(i-j)*.78+((i+j)%3)*.37).toFixed(1));}
 function calc(){var a=$("origin").value.trim(),b=$("destination").value.trim(),km=kmFor(a,b),eta=Math.round(km*2.3+2),fare=Math.ceil((1200+km*800)*types[selected].mult/10)*10;$("km").textContent=km.toLocaleString("es-AR")+" km";$("eta").textContent=eta+" min";$("price").textContent=money(fare);return {origin:a,destination:b,km:km,eta:eta,fare:fare,type:selected,payment:(document.querySelector('input[name="payment"]:checked')||{}).value||"Efectivo"};}
 function persist(){try{localStorage.setItem("bm-viajes-demo-state",JSON.stringify(state));}catch(e){}}
 function switchTab(next){tab=next;var pass=next==="passenger";$("tab-passenger").classList.toggle("active",pass);$("tab-driver").classList.toggle("active",!pass);$("tab-passenger").setAttribute("aria-selected",String(pass));$("tab-driver").setAttribute("aria-selected",String(!pass));$("passenger-panel").classList.toggle("hidden",!pass);$("driver-panel").classList.toggle("hidden",pass);render();if(window.innerWidth<850){document.querySelector(".workspace").scrollIntoView({behavior:"smooth",block:"start"});}}
@@ -134,4 +193,6 @@ try{var saved=JSON.parse(localStorage.getItem("bm-viajes-demo-state")||"null");i
 calc();render();
 })();
 </script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="./enhancements.js"></script>
 </body></html>
