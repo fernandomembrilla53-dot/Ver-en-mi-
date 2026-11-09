@@ -38,9 +38,9 @@ function withCors(response,headers){
 }
 async function rateLimit(env,key,limit,period){
  const now=Date.now(),window=Math.floor(now/period)*period;
- const row=await env.DB.prepare("SELECT hits,window_start FROM rate_limits WHERE key=?").bind(key).first();
- if(row&&row.window_start===window&&row.hits>=limit)throw new ApiError("Demasiados intentos. Probá más tarde.",429);
- await env.DB.prepare("INSERT INTO rate_limits(key,window_start,hits) VALUES(?,?,1) ON CONFLICT(key) DO UPDATE SET hits=CASE WHEN window_start=excluded.window_start THEN hits+1 ELSE 1 END,window_start=excluded.window_start").bind(key,window).run();
+ // Escritura atómica: las solicitudes simultáneas no pueden eludir el límite.
+ const result=await env.DB.prepare("INSERT INTO rate_limits(key,window_start,hits) VALUES(?,?,1) ON CONFLICT(key) DO UPDATE SET hits=CASE WHEN rate_limits.window_start=excluded.window_start THEN rate_limits.hits+1 ELSE 1 END,window_start=excluded.window_start WHERE rate_limits.window_start<>excluded.window_start OR rate_limits.hits<?").bind(key,window,limit).run();
+ if(!result.meta?.changes)throw new ApiError("Demasiados intentos. Probá más tarde.",429);
 }
 async function authenticate(req,env){
  const header=req.headers.get("Authorization")||"";
