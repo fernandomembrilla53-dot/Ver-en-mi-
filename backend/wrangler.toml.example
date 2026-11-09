@@ -10,3 +10,7 @@ database_name = "ver-en-mi-tienda"
 database_id = "REEMPLAZAR_POR_ID_DE_D1"
 # Secrets no deben aparecer en este archivo: ADMIN_PASSWORD, SESSION_SECRET
 # Opcionales para correo: BREVO_API_KEY, ORDER_NOTIFY_EMAIL, NOTIFY_SENDER_EMAIL
+
+[[r2_buckets]]
+binding = "FOTOS"
+bucket_name = "ver-en-mi-fotos"
