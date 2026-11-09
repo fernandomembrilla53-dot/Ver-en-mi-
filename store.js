@@ -16,7 +16,7 @@ panel.append(intro,content,cartBox);
 const first=section.querySelector(".card");if(first)first.after(panel);else section.prepend(panel);
 let products=[],cart=new Map();
 const status=(message,isError=false)=>{content.innerHTML='<p class="'+(isError?'shop-error':'muted')+'">'+esc(message)+'</p>';cartBox.hidden=true;};
-if(!API){status("Próximamente: Yami está preparando el catálogo y los precios actuales.");return;}
+if(!API){status("Yami todavía está preparando los nombres y precios actuales. La tienda se habilitará cuando esté conectado el panel de administración.");return;}
 const api=(path,opts={})=>fetch(API+path,{...opts,headers:{"Content-Type":"application/json",...(opts.headers||{})}}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||"No se pudo conectar");return d});
 const compare=(a,b)=>Number(b.featured)-Number(a.featured)||(a.category==="Ensaladas"?-1:b.category==="Ensaladas"?1:0)||a.name.localeCompare(b.name,"es");
 function draw(){
@@ -26,9 +26,10 @@ function draw(){
  const title=document.createElement("h3");title.textContent="Ensaladas y especialidades disponibles";content.append(title);
  sorted.forEach(p=>{
   const item=document.createElement("article");item.className="shop-product";
+  const hasAtlas=Number.isInteger(p.photo_index)&&p.photo_index>=0&&p.photo_index<16;
   const img=p.photo_url?document.createElement("img"):document.createElement("div");
   if(p.photo_url){img.src=p.photo_url;img.alt=p.name;img.loading="lazy";img.className="shop-photo";img.onerror=()=>{img.removeAttribute("src");img.alt="Foto pendiente";};}
-  else{img.className="shop-no-photo";img.textContent="Foto próximamente";}
+  else if(hasAtlas){img.className="shop-photo";img.style.backgroundImage='url("./assets/catalogo-yami-16.jpg")';img.style.backgroundSize="400% 400%";img.style.backgroundPosition=((p.photo_index%4)*100/3)+"% "+(Math.floor(p.photo_index/4)*100/3)+"%";img.setAttribute("role","img");img.setAttribute("aria-label","Foto de "+p.name);}else{img.className="shop-no-photo";img.textContent="Foto próximamente";}
   const detail=document.createElement("div");detail.className="shop-detail";
   detail.innerHTML=(p.featured?'<div class="shop-featured">MENÚ DEL DÍA</div>':'')+'<small>'+esc(p.category)+'</small><h3>'+esc(p.name)+'</h3><small>'+esc(p.description||"")+'</small><div class="shop-price">'+money(p.price_ars)+'</div>';
   const button=document.createElement("button");button.type="button";button.textContent="Agregar al pedido";button.onclick=()=>{cart.set(p.id,Math.min(20,(cart.get(p.id)||0)+1));drawCart()};
