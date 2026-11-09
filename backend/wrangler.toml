@@ -1,0 +1,11 @@
+name = "ver-en-mi-tienda"
+main = "worker-single.js"
+compatibility_date = "2026-11-09"
+
+[vars]
+APP_ORIGIN = "https://fernandomembrilla53-dot.github.io"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "ver-en-mi-tienda"
+database_id = "fddadd94-6c4b-4142-9b65-833ce068cc84"
