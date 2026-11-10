@@ -6,7 +6,7 @@
   if (!origin || !dest || !panel) return;
 
   const center = [-37.1515, -58.4859]; // Centro general de Ayacucho (no ubicacion personal).
-  const state = {map:null,markers:{},line:null,myLocation:null,watch:null,points:{origin:null,destination:null},pick:null,firstFix:true};
+  const state = {map:null,markers:{},line:null,myLocation:null,watch:null,gpsRequest:0,points:{origin:null,destination:null},pick:null,firstFix:true};
   const status = $("gps-status");
   const setStatus = (msg) => { if(status) status.textContent=msg; };
   const emitInput = (el) => el.dispatchEvent(new Event("input",{bubbles:true}));
@@ -95,9 +95,16 @@
   function locate(){
     if(!("geolocation" in navigator)){setStatus("Este dispositivo no admite geolocalización.");return;}
     setStatus("Solicitando permiso de ubicación al dispositivo...");
-    navigator.geolocation.getCurrentPosition(handlePosition,permissionError,{enableHighAccuracy:true,timeout:15000,maximumAge:10000});
+    const requestId=++state.gpsRequest;
+    navigator.geolocation.getCurrentPosition(
+      position=>{if(requestId===state.gpsRequest)handlePosition(position);},
+      error=>{if(requestId===state.gpsRequest)permissionError(error);},
+      {enableHighAccuracy:true,timeout:15000,maximumAge:10000}
+    );
   }
   function stopTracking(){
+    // Invalidar callbacks GPS pendientes: detener debe prevalecer sobre una respuesta tardía.
+    state.gpsRequest++;
     if(state.watch!==null&&navigator.geolocation)navigator.geolocation.clearWatch(state.watch);
     state.watch=null;
     if(state.markers.me&&state.map){state.map.removeLayer(state.markers.me);delete state.markers.me;}
