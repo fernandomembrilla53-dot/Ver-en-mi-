@@ -6,7 +6,7 @@
   if (!origin || !dest || !panel) return;
 
   const center = [-37.1515, -58.4859]; // Centro general de Ayacucho (no ubicacion personal).
-  const state = {map:null,markers:{},line:null,myLocation:null,watch:null,gpsRequest:0,points:{origin:null,destination:null},pick:null,firstFix:true};
+  const state = {map:null,markers:{},line:null,myLocation:null,watch:null,gpsRequest:0,points:{origin:null,destination:null},pick:null,firstFix:true,gpsOriginLabel:null};
   const status = $("gps-status");
   const setStatus = (msg) => { if(status) status.textContent=msg; };
   const emitInput = (el) => el.dispatchEvent(new Event("input",{bubbles:true}));
@@ -46,6 +46,7 @@
   function setPoint(kind,latlng){
     const p={lat:Number(latlng.lat),lng:Number(latlng.lng)};
     if(!Number.isFinite(p.lat)||!Number.isFinite(p.lng)||Math.abs(p.lat)>90||Math.abs(p.lng)>180)return;
+    if(kind==="origin")state.gpsOriginLabel=null;
     state.points[kind]=p;
     const el=kind==="origin"?origin:dest;
     el.value="Mapa: "+getLabel(p);
@@ -109,17 +110,23 @@
     state.watch=null;
     if(state.markers.me&&state.map){state.map.removeLayer(state.markers.me);delete state.markers.me;}
     state.myLocation=null;state.firstFix=true;
+    // Si la partida se obtuvo del GPS, retirar también su copia del formulario.
+    if(state.gpsOriginLabel!==null&&origin.value===state.gpsOriginLabel){
+      origin.value="";state.points.origin=null;emitInput(origin);drawRoute();
+    }
+    state.gpsOriginLabel=null;
     $("use-gps-origin").disabled=true;$("share-location").disabled=true;
     setStatus("Ubicación desactivada y eliminada de la sesión.");
   }
   $("get-gps")?.addEventListener("click",locate);
   $("stop-gps")?.addEventListener("click",stopTracking);
   $("use-gps-origin")?.addEventListener("click",()=>{
-    if(state.myLocation)setPoint("origin",state.myLocation);
+    if(state.myLocation){setPoint("origin",state.myLocation);state.gpsOriginLabel=origin.value;}
   });
   $("map-pick-origin")?.addEventListener("click",()=>{state.pick="origin";updatePick();setStatus("Tocá el mapa para marcar dónde comienza el viaje.");});
   $("map-pick-dest")?.addEventListener("click",()=>{state.pick="destination";updatePick();setStatus("Tocá el mapa para marcar tu destino.");});
-  origin.addEventListener("input",()=>{if(!origin.value.startsWith("Mapa: ")){state.points.origin=null;drawRoute();}});
+  origin.addEventListener("input",()=>{if(origin.value!==state.gpsOriginLabel)state.gpsOriginLabel=null;
+    if(!origin.value.startsWith("Mapa: ")){state.points.origin=null;drawRoute();}});
   dest.addEventListener("input",()=>{if(!dest.value.startsWith("Mapa: ")){state.points.destination=null;drawRoute();}});
   const safeShare=async(text)=>{
     try{
@@ -146,7 +153,7 @@
     try{
       const x=JSON.parse(localStorage.getItem(favoriteKey)||"null");
       if(!x||typeof x.a!=="string"||typeof x.b!=="string"){setStatus("Todavía no guardaste un recorrido.");return;}
-      origin.value=x.a;dest.value=x.b;state.points.origin=null;state.points.destination=null;
+      origin.value=x.a;dest.value=x.b;state.gpsOriginLabel=null;state.points.origin=null;state.points.destination=null;
       emitInput(origin);emitInput(dest);drawRoute();setStatus("Recorrido favorito cargado.");
     }catch(e){setStatus("No se pudo recuperar el recorrido.");}
   });
