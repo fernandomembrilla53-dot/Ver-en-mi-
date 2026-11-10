@@ -159,6 +159,9 @@
   $("save-favorite")?.addEventListener("click",()=>{
     const a=origin.value.trim(),b=dest.value.trim();
     if(!a||!b||a===b){setStatus("Elegí dos lugares distintos antes de guardarlos.");return;}
+    // No persistir inadvertidamente la posición GPS personal en localStorage.
+    // Los favoritos quedan disponibles para direcciones escritas o puntos elegidos manualmente.
+    if(state.gpsOriginLabel!==null&&a===state.gpsOriginLabel){setStatus("Por privacidad, no se guarda tu ubicación GPS como favorito. Escribí una dirección o elegí un punto manualmente.");return;}
     try{localStorage.setItem(favoriteKey,JSON.stringify({a,b}));setStatus("Recorrido favorito guardado en este dispositivo.");}catch(e){setStatus("El navegador no permitió guardar el favorito.");}
   });
   $("load-favorite")?.addEventListener("click",()=>{
