@@ -100,7 +100,7 @@ test("Cerrar sesión no depende del límite de POST y revoca únicamente el toke
  assert.equal(response.status,200);
  assert.equal((await response.json()).ok,true);
  assert.equal(queries.length,1,"No debe consultar ni modificar rate_limits");
- assert.match(queries[0],/^DELETE FROM sessions WHERE token_hash=\\?$/);
+ assert.match(queries[0],/^DELETE FROM sessions WHERE token_hash=\?$/);
 });
 test("Cerrar sesión con token inválido no toca la base",async()=>{
  let calls=0;
