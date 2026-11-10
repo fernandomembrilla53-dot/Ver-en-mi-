@@ -125,9 +125,19 @@
   });
   $("map-pick-origin")?.addEventListener("click",()=>{state.pick="origin";updatePick();setStatus("Tocá el mapa para marcar dónde comienza el viaje.");});
   $("map-pick-dest")?.addEventListener("click",()=>{state.pick="destination";updatePick();setStatus("Tocá el mapa para marcar tu destino.");});
-  origin.addEventListener("input",()=>{if(origin.value!==state.gpsOriginLabel)state.gpsOriginLabel=null;
-    if(!origin.value.startsWith("Mapa: ")){state.points.origin=null;drawRoute();}});
-  dest.addEventListener("input",()=>{if(!dest.value.startsWith("Mapa: ")){state.points.destination=null;drawRoute();}});
+  // La ruta solo es válida mientras el texto coincide exactamente con el punto elegido.
+  // Un prefijo "Mapa: " escrito a mano no debe conservar coordenadas anteriores.
+  const matchesMapPoint=(el,kind)=>{
+    const p=state.points[kind];
+    return !!p && el.value==="Mapa: "+getLabel(p);
+  };
+  origin.addEventListener("input",()=>{
+    if(origin.value!==state.gpsOriginLabel)state.gpsOriginLabel=null;
+    if(state.points.origin&&!matchesMapPoint(origin,"origin")){state.points.origin=null;drawRoute();}
+  });
+  dest.addEventListener("input",()=>{
+    if(state.points.destination&&!matchesMapPoint(dest,"destination")){state.points.destination=null;drawRoute();}
+  });
   const safeShare=async(text,sharedUrl=location.href.split("#")[0])=>{
     // La API nativa usa el campo URL: compartir coordenadas requiere pasar su enlace explícito.
     // Evitar añadir la URL de la demo a un mensaje que contiene una ubicación privada.
