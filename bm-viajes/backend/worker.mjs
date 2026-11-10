@@ -181,6 +181,9 @@ async function main(req,env){
  const url=new URL(req.url),path=url.pathname.replace(/\/$/,""),method=req.method;
  if(method==="GET"&&path==="/api/health")return json({ok:true,service:"BM Viajes",mode:env.ENABLE_LIVE_RIDES==="true"?"pilot":"demo"});
  if(method==="GET"&&path==="/api/config")return json({ok:true,live_rides_enabled:env.ENABLE_LIVE_RIDES==="true",payments_enabled:false,area:"Ayacucho",fare_calculation:"pending_municipal_tariffs"});
+ // La revocación debe seguir disponible incluso con el límite general de POST agotado.
+ // La eliminación se limita al hash del token y no crea sesiones ni viajes.
+ if(method==="POST"&&path==="/api/auth/logout")return revokeSession(req,env);
  const ip=req.headers.get("CF-Connecting-IP")||"unknown";
  if(method==="POST"){
    if(!env.AUTH_SECRET||env.AUTH_SECRET.length<32)throw new ApiError("Autenticación segura pendiente de configuración.",503);
@@ -190,7 +193,6 @@ async function main(req,env){
  if(method==="POST"&&path==="/api/auth/verify")return verifyAuth(req,env);
  const user=await authenticate(req,env);
  if(method==="GET"&&path==="/api/me")return json({ok:true,user});
- if(method==="POST"&&path==="/api/auth/logout")return revokeSession(req,env);
  if(method==="POST"&&path==="/api/driver/apply")return applyDriver(req,env,user);
  if(method==="GET"&&path==="/api/rides/mine")return myRides(env,user);
  if(method==="GET"&&path==="/api/rides/open")return openRides(env,user);
