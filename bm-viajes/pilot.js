@@ -169,7 +169,17 @@
       $("access-code").value="";setUser(r.user);alertText("Acceso verificado.");
     }catch(e){alertText(e.message,true);}
   });
-  $("signout").addEventListener("click",()=>{token="";sessionStorage.removeItem("bm-viajes-pilot-token");coords={origin:null,destination:null};setUser(null);alertText("Sesión cerrada.");});
+  $("signout").addEventListener("click",async()=>{
+     const button=$("signout");button.disabled=true;
+     let revoked=false;
+     try{await api("/api/auth/logout","POST");revoked=true;}
+     catch(e){alertText("No se pudo confirmar el cierre en el servidor. Cerramos esta pestaña; evitá compartir este dispositivo y volvé a intentarlo si tenés conexión.",true);}
+     finally{
+       token="";sessionStorage.removeItem("bm-viajes-pilot-token");
+       coords={origin:null,destination:null};myRides=[];setUser(null);button.disabled=false;
+       if(revoked)alertText("Sesión cerrada y revocada en el servidor.");
+     }
+   });
   async function boot(){
     if(!BASE){serverStatus("La API de Cloudflare todavía no está configurada. Esta pantalla no permite registrarse ni pedir viajes; usá la demo pública.","");$("pilot-api-mode").textContent="Por configurar";return;}
     try{
