@@ -81,3 +81,33 @@ test("Esquema conserva permisos de conductor y seguimiento efímero",()=>{
  assert.match(schema,/driver_status/);assert.match(schema,/ride_positions/);assert.match(schema,/otp_challenges/);
  assert.match(read("backend/worker.mjs"),/ENABLE_LIVE_RIDES/);
 });
+
+test("Cerrar sesión no depende del límite de POST y revoca únicamente el token",async()=>{
+ const queries=[];
+ const env={
+  DB:{prepare(sql){
+   queries.push(sql);
+   return {bind(...args){assert.equal(args.length,1);return {async run(){return {meta:{changes:1}};}};}};
+  }},
+  FRONTEND_ORIGIN:"https://fernandomembrilla53-dot.github.io",
+  AUTH_SECRET:"x".repeat(40),
+  ENABLE_LIVE_RIDES:"false"
+ };
+ const request=new Request("https://api.example.com/api/auth/logout",{
+  method:"POST",headers:{Authorization:"Bearer "+"a".repeat(64),"CF-Connecting-IP":"203.0.113.5"}
+ });
+ const response=await worker.fetch(request,env);
+ assert.equal(response.status,200);
+ assert.equal((await response.json()).ok,true);
+ assert.equal(queries.length,1,"No debe consultar ni modificar rate_limits");
+ assert.match(queries[0],/^DELETE FROM sessions WHERE token_hash=\\?$/);
+});
+test("Cerrar sesión con token inválido no toca la base",async()=>{
+ let calls=0;
+ const env={DB:{prepare(){calls++;throw Error("Unexpected database access");}},AUTH_SECRET:"x".repeat(40)};
+ const response=await worker.fetch(new Request("https://api.example.com/api/auth/logout",{
+  method:"POST",headers:{Authorization:"Bearer invalid"}
+ }),env);
+ assert.equal(response.status,401);
+ assert.equal(calls,0);
+});
