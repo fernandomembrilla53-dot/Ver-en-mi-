@@ -128,11 +128,13 @@
   origin.addEventListener("input",()=>{if(origin.value!==state.gpsOriginLabel)state.gpsOriginLabel=null;
     if(!origin.value.startsWith("Mapa: ")){state.points.origin=null;drawRoute();}});
   dest.addEventListener("input",()=>{if(!dest.value.startsWith("Mapa: ")){state.points.destination=null;drawRoute();}});
-  const safeShare=async(text)=>{
+  const safeShare=async(text,sharedUrl=location.href.split("#")[0])=>{
+    // La API nativa usa el campo URL: compartir coordenadas requiere pasar su enlace explícito.
+    // Evitar añadir la URL de la demo a un mensaje que contiene una ubicación privada.
     try{
-      if(navigator.share){await navigator.share({title:"BM Viajes",text,url:location.href.split("#")[0]});return;}
-      if(navigator.clipboard){await navigator.clipboard.writeText(text+"\n"+location.href.split("#")[0]);setStatus("Información copiada para compartir.");return;}
-      window.prompt("Copiá este texto para compartir:",text+"\n"+location.href.split("#")[0]);
+      if(navigator.share){await navigator.share({title:"BM Viajes",text,url:sharedUrl});return;}
+      if(navigator.clipboard){await navigator.clipboard.writeText(text+"\n"+sharedUrl);setStatus("Información copiada para compartir.");return;}
+      window.prompt("Copiá este texto para compartir:",text+"\n"+sharedUrl);
     }catch(e){if(e.name!=="AbortError")setStatus("No se pudo compartir desde este navegador.");}
   };
   $("share-trip")?.addEventListener("click",()=>{
@@ -141,7 +143,7 @@
   $("share-location")?.addEventListener("click",()=>{
     if(!state.myLocation)return;
     const p=state.myLocation,coords=p.lat.toFixed(5)+","+p.lng.toFixed(5);
-    safeShare("Comparto voluntariamente mi ubicación aproximada: https://www.google.com/maps?q="+coords);
+    safeShare("Comparto voluntariamente mi ubicación aproximada.", "https://www.google.com/maps?q="+coords);
   });
   const favoriteKey="bm-viajes-favorite-v1";
   $("save-favorite")?.addEventListener("click",()=>{
