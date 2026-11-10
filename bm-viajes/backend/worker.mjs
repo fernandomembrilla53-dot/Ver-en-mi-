@@ -50,6 +50,14 @@ async function authenticate(req,env){
  if(!found)throw new ApiError("Sesión inválida o vencida.",401);
  return found;
 }
+async function revokeSession(req,env){
+ const header=req.headers.get("Authorization")||"";
+ if(!/^Bearer [0-9a-f]{64}$/.test(header))throw new ApiError("Necesitás iniciar sesión.",401);
+ const hash=await sha256(header.slice(7));
+ const result=await env.DB.prepare("DELETE FROM sessions WHERE token_hash=?").bind(hash).run();
+ if(!result.meta?.changes)throw new ApiError("Sesión inválida o vencida.",401);
+ return json({ok:true,message:"Sesión revocada."});
+}
 async function sendEmailCode(env,email,code){
  if(!env.BREVO_API_KEY||!env.MAIL_FROM)throw new ApiError("Correo no configurado en el servidor.",503);
  const request={sender:{name:"BM Viajes",email:env.MAIL_FROM},to:[{email}],subject:"Tu código de acceso a BM Viajes",htmlContent:"<p>Tu código de acceso es:</p><p style=\"font-size:26px;font-weight:bold\">"+code+"</p><p>Caduca en 10 minutos. Si no lo solicitaste, ignorá este mensaje.</p>",textContent:"Tu código de BM Viajes es "+code+". Caduca en 10 minutos."};
@@ -182,6 +190,7 @@ async function main(req,env){
  if(method==="POST"&&path==="/api/auth/verify")return verifyAuth(req,env);
  const user=await authenticate(req,env);
  if(method==="GET"&&path==="/api/me")return json({ok:true,user});
+ if(method==="POST"&&path==="/api/auth/logout")return revokeSession(req,env);
  if(method==="POST"&&path==="/api/driver/apply")return applyDriver(req,env,user);
  if(method==="GET"&&path==="/api/rides/mine")return myRides(env,user);
  if(method==="GET"&&path==="/api/rides/open")return openRides(env,user);
