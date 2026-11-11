@@ -105,7 +105,7 @@
       if(ride.status==="in_progress"){
         action("Finalizar trayecto",{status:"completed"},"status");
         const gps=document.createElement("button");gps.className="btn secondary";gps.textContent="Enviar posición GPS ahora";
-        gps.addEventListener("click",()=>{if(!navigator.geolocation){alertText("GPS no disponible.",true);return;}navigator.geolocation.getCurrentPosition(async p=>{try{await api("/api/rides/"+ride.id+"/location","POST",{position:{lat:p.coords.latitude,lng:p.coords.longitude},accuracy_m:p.coords.accuracy});alertText("Posición enviada voluntariamente al pasajero asignado.");}catch(e){alertText(e.message,true);}},()=>alertText("Sin permiso GPS.",true),{enableHighAccuracy:true,timeout:12000});});
+        gps.addEventListener("click",()=>{if(!navigator.geolocation){alertText("GPS no disponible.",true);return;}const epoch=sessionEpoch,driverId=user?.id;navigator.geolocation.getCurrentPosition(async p=>{if(epoch!==sessionEpoch||!user||user.id!==driverId)return;try{await api("/api/rides/"+ride.id+"/location","POST",{position:{lat:p.coords.latitude,lng:p.coords.longitude},accuracy_m:p.coords.accuracy});if(epoch===sessionEpoch&&user?.id===driverId)alertText("Posición enviada voluntariamente al pasajero asignado.");}catch(e){if(epoch===sessionEpoch&&user?.id===driverId)alertText(e.message,true);}},()=>{if(epoch===sessionEpoch&&user?.id===driverId)alertText("Sin permiso GPS.",true);},{enableHighAccuracy:true,timeout:12000});});
         card.append(gps);
       }
     }else if(["requested","accepted"].includes(ride.status)){
