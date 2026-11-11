@@ -1,0 +1,31 @@
+// Run: npm install --no-save jsdom && node tests/ui.cjs (from bm-viajes).
+const {JSDOM}=require('jsdom');
+const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const root=path.resolve(__dirname,'..');
+const dom=new JSDOM(fs.readFileSync(path.join(root,'index.html'),'utf8'),{url:'https://demo.example/bm-viajes/',runScripts:'outside-only',pretendToBeVisual:true});
+const w=dom.window,d=w.document;w.scrollTo=()=>{};w.HTMLElement.prototype.scrollIntoView=()=>{};
+let mapClick,gpsSuccess,gpsError,requests=[],routeResponse;
+const map={setView(){return this},removeLayer(){},on(name,fn){if(name==='click')mapClick=fn;return this},invalidateSize(){},fitBounds(){}};
+w.L={map:()=>map,divIcon:x=>x,tileLayer:()=>({addTo(){return this},on(){return this}}),marker:()=>({addTo(){return this},bindPopup(){return this},setLatLng(){}}),polyline:()=>({addTo(){return this},getBounds(){return []}})};
+w.fetch=async(url,options)=>{requests.push(url);if(routeResponse instanceof Error)throw routeResponse;return {ok:true,json:async()=>routeResponse};};
+Object.defineProperty(w.navigator,'geolocation',{value:{getCurrentPosition(ok,bad){gpsSuccess=ok;gpsError=bad},clearWatch(){}}});
+for(const script of d.querySelectorAll('script:not([src])'))w.eval(script.textContent);
+for(const name of ['enhancements.js','uver.js'])w.eval(fs.readFileSync(path.join(root,name),'utf8'));
+const click=id=>d.getElementById(id).click();const open=key=>d.querySelector('[data-open="'+key+'"]').click();
+const input=(id,value)=>{d.getElementById(id).value=value;d.getElementById(id).dispatchEvent(new w.Event('input',{bubbles:true}));};
+const tick=()=>new Promise(resolve=>setTimeout(resolve,10));
+(async()=>{
+assert.equal(d.querySelectorAll('.screen:not([hidden])').length,1);open('trip');assert.equal(d.getElementById('screen-trip').hidden,false);
+click('street-route');assert.match(d.getElementById('gps-status').textContent,/Marcá primero/);assert.equal(requests.length,0);
+click('map-pick-origin');mapClick({latlng:{lat:-37.1515,lng:-58.4859}});click('map-pick-dest');mapClick({latlng:{lat:-37.157,lng:-58.48}});
+routeResponse={code:'Ok',routes:[{distance:898.1,duration:132.2,geometry:{coordinates:[[-58.4859,-37.1515],[-58.482,-37.153],[-58.48,-37.157]]}}]};
+click('street-route');await tick();assert.equal(w.BMGeo.routeDistanceKm(),.8981);assert.match(d.getElementById('distance-label').textContent,/por calles/);assert.equal(d.getElementById('eta').textContent,'3 min');
+input('destination','Otra dirección');assert.equal(w.BMGeo.hasRoute(),false);assert.match(d.getElementById('distance-label').textContent,/no ruta vial/);
+click('map-pick-dest');mapClick({latlng:{lat:-37.157,lng:-58.48}});routeResponse=Error('offline');click('street-route');await tick();assert.match(d.getElementById('gps-status').textContent,/No se pudo/);assert.equal(d.getElementById('street-route').disabled,false);
+click('order');assert.equal(d.getElementById('trip-detail').classList.contains('hidden'),false);click('tab-driver');click('driver-accept');click('driver-finish');assert.equal(JSON.parse(w.localStorage.getItem('bm-viajes-demo-state')).status,'completed');open('activity');assert.match(d.getElementById('activity-content').textContent,/finalizado en demo/);
+open('account');open('profile');input('profile-name','Pasajero de prueba');d.getElementById('profile-form').dispatchEvent(new w.Event('submit',{cancelable:true}));assert.equal(JSON.parse(w.localStorage.getItem('uver-profile')).name,'Pasajero de prueba');
+open('account');open('settings');click('large-text');assert.equal(d.body.classList.contains('large-text'),true);
+open('trip');click('get-gps');gpsError({code:1});assert.match(d.getElementById('gps-status').textContent,/No diste permiso/);
+click('get-gps');gpsSuccess({coords:{latitude:-37.15,longitude:-58.48,accuracy:15}});click('use-gps-origin');assert.equal(w.BMGeo.isPrivateRoute(),true);click('swap');click('stop-gps');assert.equal(d.getElementById('destination').value,'');assert.equal(w.BMGeo.isPrivateRoute(),false);
+console.log('PASS: navigation, map points, street routing, stale route invalidation, routing error, passenger/driver flow, activity, profile, preferences, denied GPS and location deletion.');w.close();
+})().catch(e=>{console.error(e);w.close();process.exitCode=1});

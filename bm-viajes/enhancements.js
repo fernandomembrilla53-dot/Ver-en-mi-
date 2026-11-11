@@ -1,4 +1,4 @@
-/* BM Viajes - mejoras progresivas 2026. Ubicacion privada y voluntaria. */
+/* UVER - mejoras progresivas 2026. Ubicacion privada y voluntaria. */
 (() => {
   "use strict";
   const $ = (id) => document.getElementById(id);
@@ -7,6 +7,7 @@
 
   const center = [-37.1515, -58.4859]; // Centro general de Ayacucho (no ubicacion personal).
   const state = {map:null,markers:{},line:null,myLocation:null,watch:null,gpsRequest:0,points:{origin:null,destination:null},pick:null,firstFix:true,gpsOriginLabel:null};
+  let streetRoute=null, routeController=null, routeVersion=0;
   const status = $("gps-status");
   const setStatus = (msg) => { if(status) status.textContent=msg; };
   const emitInput = (el) => el.dispatchEvent(new Event("input",{bubbles:true}));
@@ -18,9 +19,12 @@
   }
   window.BMGeo = {
     routeDistanceKm: () => {
+      if(streetRoute)return streetRoute.distance/1000;
       const a=state.points.origin,b=state.points.destination;
       return a&&b?Number(distance(a,b).toFixed(1)):null;
     },
+    routeMinutes: () => streetRoute?Math.max(1,Math.ceil(streetRoute.duration/60)):null,
+    isPrivateRoute: () => state.gpsOriginLabel!==null,
     hasRoute: () => !!(state.points.origin&&state.points.destination)
   };
   const getLabel = (latlng) => latlng.lat.toFixed(5)+", "+latlng.lng.toFixed(5);
@@ -29,7 +33,39 @@
     html:'<span class="bm-pin '+kind+'">'+(kind==="origin"?"A":kind==="destination"?"B":"GPS")+'</span>',
     iconSize:[39,40],iconAnchor:[19,37]
   });
+  function clearStreetRoute(){
+    routeVersion++; routeController?.abort();routeController=null;streetRoute=null;
+    if($("street-route"))$("street-route").disabled=false;
+    if($("distance-label"))$("distance-label").textContent="Distancia ilustrativa (no ruta vial)";
+    if($("time-label"))$("time-label").textContent="Tiempo ilustrativo";
+    document.dispatchEvent(new Event("uver-route"));
+  }
+  async function routeByStreet(){
+    const a=state.points.origin,b=state.points.destination;
+    if(!a||!b){setStatus("Marcá primero el origen y el destino en el mapa. Una dirección escrita sola no fija un punto.");return;}
+    clearStreetRoute();const version=routeVersion;
+    routeController=new AbortController();const controller=routeController;
+    const timeout=setTimeout(()=>controller.abort(),15000);
+    $("street-route").disabled=true;setStatus("Calculando recorrido por calles…");
+    try{
+      const response=await fetch(`https://router.project-osrm.org/route/v1/driving/${a.lng},${a.lat};${b.lng},${b.lat}?overview=full&geometries=geojson`,{signal:controller.signal});
+      if(!response.ok)throw Error("routing unavailable");
+      const data=await response.json(),r=data.routes?.[0];
+      if(data.code!=="Ok"||!r||!Number.isFinite(r.distance)||!Number.isFinite(r.duration)||r.distance<=0||!Array.isArray(r.geometry?.coordinates)||r.geometry.coordinates.length<2||!r.geometry.coordinates.every(c=>Array.isArray(c)&&c.length>=2&&Number.isFinite(c[0])&&Number.isFinite(c[1])&&Math.abs(c[0])<=180&&Math.abs(c[1])<=90))throw Error("invalid route");
+      if(version!==routeVersion)return;
+      streetRoute=r;
+      if(state.line)state.map.removeLayer(state.line);
+      state.line=L.polyline(r.geometry.coordinates.map(c=>[c[1],c[0]]),{color:"#172c20",weight:5,opacity:.9}).addTo(state.map);
+      state.map.fitBounds(state.line.getBounds(),{padding:[30,60]});
+      $("distance-label").textContent="Distancia por calles";$("time-label").textContent="Tiempo estimado · sin tráfico";
+      setStatus(`Ruta por calles: ${(r.distance/1000).toFixed(1).replace('.',',')} km · ${Math.ceil(r.duration/60)} min. OSRM, sin tráfico en vivo. Tarifa sólo de ejemplo.`);
+      document.dispatchEvent(new Event("uver-route"));
+    }catch(e){if(version===routeVersion)setStatus("No se pudo obtener la ruta por calles. Revisá la conexión y reintentá. La línea punteada es sólo distancia aérea.");}
+    finally{clearTimeout(timeout);if(version===routeVersion){$("street-route").disabled=false;routeController=null;}}
+  }
+  $("street-route")?.addEventListener("click",routeByStreet);
   function drawRoute(){
+    clearStreetRoute();
     if(!state.map||!window.L)return;
     if(state.line){state.map.removeLayer(state.line);state.line=null;}
     for(const kind of ["origin","destination"]){
@@ -39,7 +75,7 @@
     }
     const a=state.points.origin,b=state.points.destination;
     if(a&&b){
-      state.line=L.polyline([[a.lat,a.lng],[b.lat,b.lng]],{color:"#e3a341",weight:5,dashArray:"7 9",opacity:.95}).addTo(state.map);
+      state.line=L.polyline([[a.lat,a.lng],[b.lat,b.lng]],{color:"#758279",weight:5,dashArray:"7 9",opacity:.95}).addTo(state.map);
       setStatus("Distancia aérea aproximada: "+distance(a,b).toFixed(1).replace(".",",")+" km. No es una ruta por calles.");
     }
   }
@@ -63,9 +99,10 @@
     if(!window.L){setStatus("Sin conexión para cargar el mapa. La simulación sigue disponible.");return;}
     try{
       state.map=L.map(panel,{zoomControl:true,scrollWheelZoom:false}).setView(center,14);
-      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{
+      const tiles=L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{
         maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors'
       }).addTo(state.map);
+      tiles.on("tileerror",()=>setStatus("No se pudieron cargar algunas calles del mapa. Revisá tu conexión."));
       panel.classList.add("map-ready");
       const aside=panel.closest(".map-panel");
       if(aside) aside.classList.add("has-live-map");
@@ -114,10 +151,15 @@
     if(state.gpsOriginLabel!==null&&origin.value===state.gpsOriginLabel){
       origin.value="";state.points.origin=null;emitInput(origin);drawRoute();
     }
+    if(state.gpsOriginLabel!==null&&dest.value===state.gpsOriginLabel){dest.value="";state.points.destination=null;emitInput(dest);drawRoute();}
     state.gpsOriginLabel=null;
     $("use-gps-origin").disabled=true;$("share-location").disabled=true;
     setStatus("Ubicación desactivada y eliminada de la sesión.");
   }
+  $("swap")?.addEventListener("click",()=>{
+    const a=state.points.origin;state.points.origin=state.points.destination;state.points.destination=a;
+    drawRoute();
+  });
   $("get-gps")?.addEventListener("click",locate);
   $("stop-gps")?.addEventListener("click",stopTracking);
   $("use-gps-origin")?.addEventListener("click",()=>{
@@ -142,13 +184,13 @@
     // La API nativa usa el campo URL: compartir coordenadas requiere pasar su enlace explícito.
     // Evitar añadir la URL de la demo a un mensaje que contiene una ubicación privada.
     try{
-      if(navigator.share){await navigator.share({title:"BM Viajes",text,url:sharedUrl});return;}
+      if(navigator.share){await navigator.share({title:"UVER",text,url:sharedUrl});return;}
       if(navigator.clipboard){await navigator.clipboard.writeText(text+"\n"+sharedUrl);setStatus("Información copiada para compartir.");return;}
       window.prompt("Copiá este texto para compartir:",text+"\n"+sharedUrl);
     }catch(e){if(e.name!=="AbortError")setStatus("No se pudo compartir desde este navegador.");}
   };
   $("share-trip")?.addEventListener("click",()=>{
-    safeShare("BM Viajes (demo sin reservas): "+origin.value+" a "+dest.value+".");
+    safeShare("UVER (demo sin reservas): "+origin.value+" a "+dest.value+".");
   });
   $("share-location")?.addEventListener("click",()=>{
     if(!state.myLocation)return;
@@ -184,7 +226,7 @@
     if(prompt){prompt.prompt();await prompt.userChoice;prompt=null;$("install-app").hidden=true;}
     else setStatus("Para instalar: abrí el menú de Chrome y elegí «Instalar aplicación» o «Agregar a pantalla principal».");
   });
-  window.addEventListener("appinstalled",()=>setStatus("BM Viajes se agregó a tu dispositivo."));
+  window.addEventListener("appinstalled",()=>setStatus("UVER se agregó a tu dispositivo."));
   if("serviceWorker" in navigator && location.protocol==="https:"){
     window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}),{once:true});
   }

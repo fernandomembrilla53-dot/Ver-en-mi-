@@ -1,7 +1,7 @@
 {
-  "name": "Uver | Movilidad local",
-  "short_name": "Uver",
-  "description": "Uver: demostración de movilidad local en Ayacucho con mapa y GPS voluntario. Sin viajes ni cobros reales.",
+  "name": "UVER · Ayacucho",
+  "short_name": "UVER",
+  "description": "Demo de movilidad en Ayacucho. Sin viajes ni cobros reales.",
   "lang": "es-AR",
   "start_url": "./",
   "scope": "./",
@@ -12,7 +12,7 @@
   ],
   "orientation": "any",
   "background_color": "#ffffff",
-  "theme_color": "#111111",
+  "theme_color": "#ffffff",
   "icons": [
     {
       "src": "./icon-192.png",
@@ -37,12 +37,12 @@
     {
       "name": "Explorar viaje (demo)",
       "short_name": "Pasajero",
-      "url": "./#inicio"
+      "url": "./#trip"
     },
     {
       "name": "Panel de conductor (demo)",
       "short_name": "Conductor",
-      "url": "./#conductor"
+      "url": "./#driver"
     }
   ]
 }

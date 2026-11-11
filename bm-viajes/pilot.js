@@ -1,4 +1,4 @@
-/* BM Viajes - cliente de piloto. Sin API configurada no opera viajes. */
+/* UVER - cliente de piloto. Sin API configurada no opera viajes. */
 (() => {
   "use strict";
   const $=id=>document.getElementById(id);
