@@ -1,6 +1,6 @@
 /* BM Viajes: la app se puede abrir sin conexión; los mapas requieren Internet.
    Nunca guarda en caché ubicaciones GPS ni datos del servidor. */
-const CACHE="bm-viajes-shell-2026-11-09-v7";
+const CACHE="bm-viajes-shell-2026-11-11-v8";
 const SHELL=["./","./index.html","./manifest.webmanifest","./icon.svg","./icon-192.png","./icon-512.png","./enhancements.js","./piloto.html","./pilot.js","./config.js","./privacidad.html"];
 self.addEventListener("install",event=>{
  event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL)).then(()=>self.skipWaiting()));
@@ -34,8 +34,10 @@ self.addEventListener("fetch",event=>{
  // Solo recursos públicos explícitos: nunca cachear endpoints, parámetros ni rutas nuevas.
  const allowed=new Set(SHELL.map(path=>new URL(path,self.registration.scope).pathname));
  if(url.search || !allowed.has(url.pathname))return;
- // La política de privacidad debe mostrar la versión más reciente si hay conexión.
- if(url.pathname===new URL("./privacidad.html",self.registration.scope).pathname){
+ // La configuración de la API y la política de privacidad deben renovarse
+ // desde la red: una versión cacheada de config.js puede bloquear la conexión.
+ if(url.pathname===new URL("./config.js",self.registration.scope).pathname ||
+    url.pathname===new URL("./privacidad.html",self.registration.scope).pathname){
   event.respondWith(fetch(request).catch(()=>caches.match(request)));
   return;
  }
