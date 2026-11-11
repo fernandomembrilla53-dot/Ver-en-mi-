@@ -1,4 +1,4 @@
-/* UVER - mejoras progresivas 2026. Ubicacion privada y voluntaria. */
+/* BM Viajes - mejoras progresivas 2026. Ubicacion privada y voluntaria. */
 (() => {
   "use strict";
   const $ = (id) => document.getElementById(id);
@@ -184,13 +184,13 @@
     // La API nativa usa el campo URL: compartir coordenadas requiere pasar su enlace explícito.
     // Evitar añadir la URL de la demo a un mensaje que contiene una ubicación privada.
     try{
-      if(navigator.share){await navigator.share({title:"UVER",text,url:sharedUrl});return;}
+      if(navigator.share){await navigator.share({title:"BM Viajes",text,url:sharedUrl});return;}
       if(navigator.clipboard){await navigator.clipboard.writeText(text+"\n"+sharedUrl);setStatus("Información copiada para compartir.");return;}
       window.prompt("Copiá este texto para compartir:",text+"\n"+sharedUrl);
     }catch(e){if(e.name!=="AbortError")setStatus("No se pudo compartir desde este navegador.");}
   };
   $("share-trip")?.addEventListener("click",()=>{
-    safeShare("UVER (demo sin reservas): "+origin.value+" a "+dest.value+".");
+    safeShare("BM Viajes (demo sin reservas): "+origin.value+" a "+dest.value+".");
   });
   $("share-location")?.addEventListener("click",()=>{
     if(!state.myLocation)return;
@@ -226,7 +226,7 @@
     if(prompt){prompt.prompt();await prompt.userChoice;prompt=null;$("install-app").hidden=true;}
     else setStatus("Para instalar: abrí el menú de Chrome y elegí «Instalar aplicación» o «Agregar a pantalla principal».");
   });
-  window.addEventListener("appinstalled",()=>setStatus("UVER se agregó a tu dispositivo."));
+  window.addEventListener("appinstalled",()=>setStatus("BM Viajes se agregó a tu dispositivo."));
   if("serviceWorker" in navigator && location.protocol==="https:"){
     window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}),{once:true});
   }
