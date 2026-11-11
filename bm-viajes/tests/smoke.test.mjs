@@ -59,7 +59,7 @@ test("Demo aclara la simulación y GPS con permiso",()=>{
 test("Cache offline limitado a BM Viajes, sin tiles ni datos de viaje",()=>{
  const sw=read("sw.js");
  assert.match(sw,/url\.origin!==self\.location\.origin/);
- assert.ok(sw.includes('url.pathname.includes("/bm-viajes/")'));
+ assert.match(sw,/url\.pathname\.startsWith\(scopePath\)/);
  assert.ok(!sw.includes("tile.openstreetmap.org"));
 });
 test("API informa correctamente cuando no hay viajes reales habilitados",async()=>{
