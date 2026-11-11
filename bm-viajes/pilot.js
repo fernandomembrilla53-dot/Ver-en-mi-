@@ -180,17 +180,20 @@
     }catch(e){alertText(e.message,true);}
   });
   $("signout").addEventListener("click",async()=>{
-     const button=$("signout");button.disabled=true;
-     let revoked=false;
-     try{await api("/api/auth/logout","POST");revoked=true;}
-     catch(e){alertText("No se pudo confirmar el cierre en el servidor. Cerramos esta pestaña; evitá compartir este dispositivo y volvé a intentarlo si tenés conexión.",true);}
-     finally{
-       sessionEpoch++; // Invalidar consultas en vuelo antes de limpiar datos privados.
-       token="";sessionStorage.removeItem("bm-viajes-pilot-token");
-       coords={origin:null,destination:null};myRides=[];pick=null;redraw();setUser(null);button.disabled=false;
-       if(revoked)alertText("Sesión cerrada y revocada en el servidor.");
-     }
-   });
+    const button=$("signout");button.disabled=true;
+    // Iniciar revocación con el token actual, pero limpiar la pantalla sin esperar a la red.
+    const revoke=api("/api/auth/logout","POST");
+    sessionEpoch++; // Invalidar respuestas de consultas y GPS pendientes.
+    token="";sessionStorage.removeItem("bm-viajes-pilot-token");
+    coords={origin:null,destination:null};myRides=[];pick=null;redraw();setUser(null);
+    alertText("Sesión cerrada en este dispositivo. Confirmando revocación en el servidor.");
+    try{
+      await revoke;
+      alertText("Sesión cerrada y revocada en el servidor.");
+    }catch(e){
+      alertText("Sesión local cerrada. No se pudo confirmar la revocación en el servidor; evitá reutilizar esta sesión en otro dispositivo.",true);
+    }finally{button.disabled=false;}
+  });
   async function boot(){
     if(!BASE){serverStatus("La API de Cloudflare todavía no está configurada. Esta pantalla no permite registrarse ni pedir viajes; usá la demo pública.","");$("pilot-api-mode").textContent="Por configurar";return;}
     try{
