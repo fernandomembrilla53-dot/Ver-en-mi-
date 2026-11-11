@@ -112,7 +112,7 @@
       action("Cancelar pedido",{status:"cancelled"},"status");
       if(ride.status==="accepted"){
         const view=document.createElement("button");view.className="btn secondary";view.textContent="Consultar GPS del conductor";
-        view.addEventListener("click",async()=>{try{const d=await api("/api/rides/"+ride.id+"/location");if(d.position&&map){map.setView([d.position.lat,d.position.lng],16);alertText("Posición reciente del conductor (con su autorización).");}else alertText("El conductor aún no compartió una posición reciente.");}catch(e){alertText(e.message,true);}});
+        view.addEventListener("click",async()=>{const epoch=sessionEpoch,viewerId=user?.id;try{const d=await api("/api/rides/"+ride.id+"/location");if(epoch!==sessionEpoch||!user||user.id!==viewerId)return;if(d.position&&map){map.setView([d.position.lat,d.position.lng],16);alertText("Posición reciente del conductor (con su autorización).");}else alertText("El conductor aún no compartió una posición reciente.");}catch(e){if(epoch===sessionEpoch&&user?.id===viewerId)alertText(e.message,true);}});
         card.append(view);
       }
     }
