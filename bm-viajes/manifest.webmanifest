@@ -1,7 +1,7 @@
 {
-  "name": "BM Viajes | Movilidad local",
-  "short_name": "BM Viajes",
-  "description": "Demo interactiva de movilidad para Ayacucho. Mapas y GPS voluntario, sin reservas ni cobros reales.",
+  "name": "Uver | Movilidad local",
+  "short_name": "Uver",
+  "description": "Uver: demostración de movilidad local en Ayacucho con mapa y GPS voluntario. Sin viajes ni cobros reales.",
   "lang": "es-AR",
   "start_url": "./",
   "scope": "./",
@@ -11,8 +11,8 @@
     "minimal-ui"
   ],
   "orientation": "any",
-  "background_color": "#f4f6f8",
-  "theme_color": "#101b29",
+  "background_color": "#ffffff",
+  "theme_color": "#111111",
   "icons": [
     {
       "src": "./icon-192.png",
@@ -35,7 +35,7 @@
   ],
   "shortcuts": [
     {
-      "name": "Pedir viaje (demo)",
+      "name": "Explorar viaje (demo)",
       "short_name": "Pasajero",
       "url": "./#inicio"
     },
