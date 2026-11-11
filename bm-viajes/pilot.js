@@ -6,7 +6,7 @@
   const center=[-37.1515,-58.4859];
   let token=sessionStorage.getItem("bm-viajes-pilot-token")||"";
   let user=null,live=false,map=null,pick=null,markers={},line=null,coords={origin:null,destination:null},myRides=[],tab="passenger";
-  let refreshTimer=null;
+  let refreshTimer=null,sessionEpoch=0;
   function alertText(message,bad=false){
     const el=$("pilot-alert");el.hidden=false;el.textContent=message;el.className="status"+(bad?" error":" success");
   }
@@ -27,6 +27,7 @@
     }finally{clearTimeout(timeout);}
   }
   function setUser(next){
+    sessionEpoch++;
     user=next;
     $("login-section").hidden=!!next;$("user-area").hidden=!next;
     if(next){
@@ -117,11 +118,15 @@
   };
   async function refresh(){
     if(!user)return;
-    const r=await api("/api/rides/mine");myRides=r.rides||[];
+    const epoch=sessionEpoch;
+    const r=await api("/api/rides/mine");
+    if(epoch!==sessionEpoch||!user)return; // No restaurar viajes de una sesión cerrada.
+    myRides=r.rides||[];
     show("my-rides",myRides.filter(x=>x.rider_id===user.id || !x.rider_id&&x.driver_id!==user.id).map(x=>rideCard(x,false)),"Todavía no tenés viajes.");
     show("driver-current",myRides.filter(x=>x.driver_id===user.id).map(x=>rideCard(x,true)),"Todavía no hay viajes asignados.");
     if(user.driver_status==="approved"&&live){
       const open=await api("/api/rides/open");
+      if(epoch!==sessionEpoch||!user)return;
       const cards=(open.rides||[]).map(ride=>{
         const el=document.createElement("div");el.className="trip";
         const name=document.createElement("strong");name.textContent="Solicitud "+ride.id.slice(0,8);
@@ -175,6 +180,7 @@
      try{await api("/api/auth/logout","POST");revoked=true;}
      catch(e){alertText("No se pudo confirmar el cierre en el servidor. Cerramos esta pestaña; evitá compartir este dispositivo y volvé a intentarlo si tenés conexión.",true);}
      finally{
+       sessionEpoch++; // Invalidar consultas en vuelo antes de limpiar datos privados.
        token="";sessionStorage.removeItem("bm-viajes-pilot-token");
        coords={origin:null,destination:null};myRides=[];pick=null;redraw();setUser(null);button.disabled=false;
        if(revoked)alertText("Sesión cerrada y revocada en el servidor.");
