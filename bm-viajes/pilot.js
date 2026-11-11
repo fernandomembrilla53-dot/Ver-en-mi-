@@ -79,11 +79,16 @@
   $("set-pickup").addEventListener("click",()=>{pick="origin";redraw();alertText("Tocá un punto en el mapa para marcar el origen A.");});
   $("set-dropoff").addEventListener("click",()=>{pick="destination";redraw();alertText("Tocá un punto en el mapa para marcar el destino B.");});
   $("gps-pickup").addEventListener("click",()=>{
+    if(!user){alertText("Iniciá sesión antes de utilizar el GPS del piloto.",true);return;}
     if(!navigator.geolocation){alertText("GPS no disponible.",true);return;}
+    const epoch=sessionEpoch;
     navigator.geolocation.getCurrentPosition(p=>{
+      if(epoch!==sessionEpoch||!user)return; // Ignorar GPS pendiente tras cerrar sesión o cambiar de usuario.
       setPoint("origin",{lat:p.coords.latitude,lng:p.coords.longitude});map?.setView([p.coords.latitude,p.coords.longitude],16);
       alertText("Tu ubicación quedó marcada solo en esta sesión, hasta que elijas enviar un viaje.");
-    },()=>alertText("No se obtuvo permiso de GPS. Podés señalar el lugar en el mapa.",true),{enableHighAccuracy:true,timeout:15000,maximumAge:10000});
+    },()=>{
+      if(epoch===sessionEpoch&&user)alertText("No se obtuvo permiso de GPS. Podés señalar el lugar en el mapa.",true);
+    },{enableHighAccuracy:true,timeout:15000,maximumAge:10000});
   });
   function rideCard(ride,asDriver){
     const card=document.createElement("div");card.className="trip";
