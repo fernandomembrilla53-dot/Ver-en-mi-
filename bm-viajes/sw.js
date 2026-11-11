@@ -1,6 +1,6 @@
 /* BM Viajes: la app se puede abrir sin conexión; los mapas requieren Internet.
    Nunca guarda en caché ubicaciones GPS ni datos del servidor. */
-const CACHE="bm-viajes-shell-2026-11-11-uver-v9";
+const CACHE="bm-viajes-shell-2026-11-11-uver-v10";
 const SHELL=["./","./index.html","./manifest.webmanifest","./icon.svg","./icon-192.png","./icon-512.png","./enhancements.js","./uver.css","./uver.js","./piloto.html","./pilot.js","./config.js","./privacidad.html"];
 self.addEventListener("install",event=>{
  event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL)).then(()=>self.skipWaiting()));
