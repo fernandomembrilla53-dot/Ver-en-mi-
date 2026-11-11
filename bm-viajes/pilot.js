@@ -176,7 +176,7 @@
      catch(e){alertText("No se pudo confirmar el cierre en el servidor. Cerramos esta pestaña; evitá compartir este dispositivo y volvé a intentarlo si tenés conexión.",true);}
      finally{
        token="";sessionStorage.removeItem("bm-viajes-pilot-token");
-       coords={origin:null,destination:null};myRides=[];setUser(null);button.disabled=false;
+       coords={origin:null,destination:null};myRides=[];pick=null;redraw();setUser(null);button.disabled=false;
        if(revoked)alertText("Sesión cerrada y revocada en el servidor.");
      }
    });
