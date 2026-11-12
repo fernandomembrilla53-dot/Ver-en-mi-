@@ -39,7 +39,7 @@
       if(!map)initMap();else setTimeout(()=>map.invalidateSize(),50);
       if(refreshTimer)clearInterval(refreshTimer);
       refreshTimer=setInterval(()=>{if(!document.hidden)refresh().catch(()=>{});},15000);
-      refresh().catch(e=>alertText(e.message,true));
+      refreshWithFeedback();
     }else{
       if(refreshTimer)clearInterval(refreshTimer);refreshTimer=null;
       $("my-rides").textContent="Sin viajes.";$("driver-current").textContent="Sin viaje asignado.";$("available-rides").textContent="Sin pedidos.";
@@ -122,6 +122,10 @@
   const show=(id,cards,empty)=>{
     const host=$(id);host.replaceChildren();if(!cards.length){host.textContent=empty;return;}cards.forEach(x=>host.appendChild(x));
   };
+  async function refreshWithFeedback(){
+    const epoch=sessionEpoch;
+    try{await refresh();}catch(e){if(epoch===sessionEpoch&&user)alertText(e.message,true);}
+  }
   async function refresh(){
     if(!user)return;
     const epoch=sessionEpoch;
@@ -144,7 +148,7 @@
       show("available-rides",cards,"No hay solicitudes abiertas.");
     }else $("available-rides").textContent="Solo visible con conductor verificado y servicio habilitado.";
   }
-  $("refresh").addEventListener("click",()=>refresh().catch(e=>alertText(e.message,true)));
+  $("refresh").addEventListener("click",()=>refreshWithFeedback());
   $("request-ride").addEventListener("click",async()=>{
     if(!user||!live||requestPending||!coords.origin||!coords.destination)return;
     const epoch=sessionEpoch;
