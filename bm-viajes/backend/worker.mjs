@@ -22,7 +22,8 @@ function haversine(a,b){
 }
 function coords(data,key){
  const x=data?.[key];if(!x||typeof x!=="object")throw new ApiError("Faltan coordenadas de "+key,400);
- const lat=Number(x.lat),lng=Number(x.lng);
+ // No coercionar null, booleanos ni cadenas a coordenadas GPS.
+ const lat=x.lat,lng=x.lng;
  if(!Number.isFinite(lat)||!Number.isFinite(lng)||Math.abs(lat)>90||Math.abs(lng)>180)throw new ApiError("Coordenadas inválidas.",400);
  if(haversine(CENTER,{lat,lng})>30)throw new ApiError("Por ahora, la zona piloto se limita a Ayacucho.",400);
  return {lat,lng};
@@ -162,7 +163,7 @@ async function driverPosition(req,env,user,id){
  liveOnly(env);driverOnly(user);
  const ride=await rideAccess(env,user,id);
  if(ride.driver_id!==user.id||!["accepted","in_progress"].includes(ride.status))throw new ApiError("No hay viaje activo asignado.",403);
- const body=await jsonInput(req),p=coords({position:body?.position},"position"),accuracy=Number(body?.accuracy_m);
+ const body=await jsonInput(req),p=coords({position:body?.position},"position"),accuracy=body?.accuracy_m;
  if(!Number.isFinite(accuracy)||accuracy<0||accuracy>300)throw new ApiError("GPS insuficientemente preciso.",400);
  const now=Date.now();
  // Validar la asignación en la misma escritura: una cancelación concurrente no debe reactivar el GPS.
