@@ -151,8 +151,10 @@
     catch(e){alertText(e.message,true);}finally{redraw();}
   });
   $("driver-apply").addEventListener("click",async()=>{
-    try{await api("/api/driver/apply","POST",{accept_review:true});const r=await api("/api/me");setUser(r.user);alertText("Solicitud de revisión registrada. No habilita viajes por sí sola.");}
-    catch(e){alertText(e.message,true);}
+    if(!user)return;
+    const epoch=sessionEpoch;
+    try{await api("/api/driver/apply","POST",{accept_review:true});if(epoch!==sessionEpoch||!user)return;const r=await api("/api/me");if(epoch!==sessionEpoch||!user)return;setUser(r.user);alertText("Solicitud de revisión registrada. No habilita viajes por sí sola.");}
+    catch(e){if(epoch===sessionEpoch&&user)alertText(e.message,true);}
   });
   function switchTab(next){
     tab=next;const pax=next==="passenger";
