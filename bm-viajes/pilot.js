@@ -109,9 +109,9 @@
         gps.addEventListener("click",()=>{if(!navigator.geolocation){alertText("GPS no disponible.",true);return;}const epoch=sessionEpoch,driverId=user?.id;navigator.geolocation.getCurrentPosition(async p=>{if(epoch!==sessionEpoch||!user||user.id!==driverId)return;try{await api("/api/rides/"+ride.id+"/location","POST",{position:{lat:p.coords.latitude,lng:p.coords.longitude},accuracy_m:p.coords.accuracy});if(epoch===sessionEpoch&&user?.id===driverId)alertText("Posición enviada voluntariamente al pasajero asignado.");}catch(e){if(epoch===sessionEpoch&&user?.id===driverId)alertText(e.message,true);}},()=>{if(epoch===sessionEpoch&&user?.id===driverId)alertText("Sin permiso GPS.",true);},{enableHighAccuracy:true,timeout:12000});});
         card.append(gps);
       }
-    }else if(["requested","accepted"].includes(ride.status)){
-      action("Cancelar pedido",{status:"cancelled"},"status");
-      if(ride.status==="accepted"){
+    }else if(["requested","accepted","in_progress"].includes(ride.status)){
+      if(ride.status!=="in_progress")action("Cancelar pedido",{status:"cancelled"},"status");
+      if(["accepted","in_progress"].includes(ride.status)){
         const view=document.createElement("button");view.className="btn secondary";view.textContent="Consultar GPS del conductor";
         view.addEventListener("click",async()=>{const epoch=sessionEpoch,viewerId=user?.id;try{const d=await api("/api/rides/"+ride.id+"/location");if(epoch!==sessionEpoch||!user||user.id!==viewerId)return;if(d.position&&map){map.setView([d.position.lat,d.position.lng],16);alertText("Posición reciente del conductor (con su autorización).");}else alertText("El conductor aún no compartió una posición reciente.");}catch(e){if(epoch===sessionEpoch&&user?.id===viewerId)alertText(e.message,true);}});
         card.append(view);
