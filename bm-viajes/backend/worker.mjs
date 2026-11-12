@@ -158,7 +158,8 @@ async function acceptRide(env,user,id){
  const now=Date.now();
  const current=await env.DB.prepare("SELECT id FROM rides WHERE driver_id=? AND status IN ('accepted','in_progress') LIMIT 1").bind(user.id).first();
  if(current)throw new ApiError("Ya tenés un viaje en curso.",409);
- const result=await env.DB.prepare("UPDATE rides SET driver_id=?,status='accepted',updated_at=? WHERE id=? AND status='requested' AND expires_at>? AND driver_id IS NULL AND rider_id<>? AND NOT EXISTS (SELECT 1 FROM rides AS active WHERE active.driver_id=? AND active.status IN ('accepted','in_progress'))").bind(user.id,now,id,now,user.id,user.id).run();
+ // Revalidar aprobación en la escritura: una suspensión concurrente impide aceptar.
+ const result=await env.DB.prepare("UPDATE rides SET driver_id=?,status='accepted',updated_at=? WHERE id=? AND status='requested' AND expires_at>? AND driver_id IS NULL AND rider_id<>? AND NOT EXISTS (SELECT 1 FROM rides AS active WHERE active.driver_id=? AND active.status IN ('accepted','in_progress')) AND EXISTS (SELECT 1 FROM users WHERE id=? AND driver_status='approved')").bind(user.id,now,id,now,user.id,user.id,user.id).run();
  if(!result.meta?.changes)throw new ApiError("El pedido ya fue aceptado o venció.",409);
  return json({ok:true,status:"accepted"});
 }
