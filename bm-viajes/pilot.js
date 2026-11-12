@@ -97,7 +97,7 @@
     card.append(strong,detail);
     function action(label,next,method){
       const b=document.createElement("button");b.type="button";b.className="btn secondary";b.textContent=label;
-      b.addEventListener("click",async()=>{b.disabled=true;try{await api("/api/rides/"+ride.id+"/"+method,"POST",next);await refresh();alertText("Estado actualizado.");}catch(e){alertText(e.message,true);}finally{b.disabled=false;}});
+      b.addEventListener("click",async()=>{if(!user||b.disabled)return;const epoch=sessionEpoch;const current=()=>epoch===sessionEpoch&&!!user;b.disabled=true;try{await api("/api/rides/"+ride.id+"/"+method,"POST",next);if(!current())return;await refresh();if(current())alertText("Estado actualizado.");}catch(e){if(current())alertText(e.message,true);}finally{b.disabled=false;}});
       card.append(b);
     }
     if(asDriver){
