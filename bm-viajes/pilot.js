@@ -43,6 +43,8 @@
       refreshWithFeedback();
     }else{
       if(refreshTimer)clearInterval(refreshTimer);refreshTimer=null;
+      // Clear account-specific text even while the account panel is hidden.
+      $("user-email").textContent="";$("user-role").textContent="";$("driver-status").textContent="";
       $("my-rides").textContent="Sin viajes.";$("driver-current").textContent="Sin viaje asignado.";$("available-rides").textContent="Sin pedidos.";
     }
   }
