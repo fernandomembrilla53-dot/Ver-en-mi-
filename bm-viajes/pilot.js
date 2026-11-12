@@ -6,7 +6,7 @@
   const center=[-37.1515,-58.4859];
   let token=sessionStorage.getItem("bm-viajes-pilot-token")||"";
   let user=null,live=false,map=null,pick=null,markers={},line=null,coords={origin:null,destination:null},myRides=[],tab="passenger";
-  let refreshTimer=null,sessionEpoch=0,requestPending=false,acceptPending=new Set();
+  let refreshTimer=null,sessionEpoch=0,refreshGeneration=0,requestPending=false,acceptPending=new Set();
   function alertText(message,bad=false){
     const el=$("pilot-alert");el.hidden=false;el.textContent=message;el.className="status"+(bad?" error":" success");
   }
@@ -128,15 +128,15 @@
   }
   async function refresh(){
     if(!user)return;
-    const epoch=sessionEpoch;
+    const epoch=sessionEpoch, generation=++refreshGeneration;
     const r=await api("/api/rides/mine");
-    if(epoch!==sessionEpoch||!user)return; // No restaurar viajes de una sesión cerrada.
+    if(epoch!==sessionEpoch||generation!==refreshGeneration||!user)return; // No restaurar viajes de una sesión cerrada.
     myRides=r.rides||[];
     show("my-rides",myRides.filter(x=>x.rider_id===user.id || !x.rider_id&&x.driver_id!==user.id).map(x=>rideCard(x,false)),"Todavía no tenés viajes.");
     show("driver-current",myRides.filter(x=>x.driver_id===user.id).map(x=>rideCard(x,true)),"Todavía no hay viajes asignados.");
     if(user.driver_status==="approved"&&live){
       const open=await api("/api/rides/open");
-      if(epoch!==sessionEpoch||!user)return;
+      if(epoch!==sessionEpoch||generation!==refreshGeneration||!user)return;
       const cards=(open.rides||[]).map(ride=>{
         const el=document.createElement("div");el.className="trip";
         const name=document.createElement("strong");name.textContent="Solicitud "+ride.id.slice(0,8);
