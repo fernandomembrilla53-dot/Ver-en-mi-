@@ -6,7 +6,7 @@
   const center=[-37.1515,-58.4859];
   let token=sessionStorage.getItem("bm-viajes-pilot-token")||"";
   let user=null,live=false,map=null,pick=null,markers={},line=null,coords={origin:null,destination:null},myRides=[],tab="passenger";
-  let refreshTimer=null,sessionEpoch=0;
+  let refreshTimer=null,sessionEpoch=0,requestPending=false,acceptPending=new Set();
   function alertText(message,bad=false){
     const el=$("pilot-alert");el.hidden=false;el.textContent=message;el.className="status"+(bad?" error":" success");
   }
@@ -28,6 +28,7 @@
   }
   function setUser(next){
     sessionEpoch++;
+    requestPending=false;acceptPending=new Set();
     user=next;
     $("login-section").hidden=!!next;$("user-area").hidden=!next;
     if(next){
@@ -59,7 +60,7 @@
       line=L.polyline([[coords.origin.lat,coords.origin.lng],[coords.destination.lat,coords.destination.lng]],{color:"#f0a832",weight:5,dashArray:"8 8"}).addTo(map);
       $("pickup-status").textContent="A: "+latText(coords.origin)+" · B: "+latText(coords.destination)+". Distancia aérea: "+distKm(coords.origin,coords.destination)+" km, no ruta de calles.";
     }else $("pickup-status").textContent=coords.origin?"Elegiste origen A. Ahora marcá B.":"Elegí origen y destino en el mapa.";
-    $("request-ride").disabled=!(live&&coords.origin&&coords.destination);
+    $("request-ride").disabled=!(user&&live&&!requestPending&&coords.origin&&coords.destination);
     $("set-pickup").setAttribute("aria-pressed",String(pick==="origin"));
     $("set-dropoff").setAttribute("aria-pressed",String(pick==="destination"));
   }
@@ -136,8 +137,8 @@
         const el=document.createElement("div");el.className="trip";
         const name=document.createElement("strong");name.textContent="Solicitud "+ride.id.slice(0,8);
         const details=document.createElement("small");details.textContent="Aprox. "+ride.distance_air_km+" km en línea recta. No incluye tarifa.";
-        const button=document.createElement("button");button.className="btn";button.textContent="Aceptar solicitud";
-        button.addEventListener("click",async()=>{button.disabled=true;try{await api("/api/rides/"+ride.id+"/accept","POST",{});await refresh();alertText("Viaje asignado.");}catch(e){alertText(e.message,true);}finally{button.disabled=false;}});
+        const button=document.createElement("button");button.className="btn";button.textContent="Aceptar solicitud";button.disabled=acceptPending.has(ride.id);
+        button.addEventListener("click",async()=>{if(!user||!live||button.disabled||acceptPending.has(ride.id))return;const epoch=sessionEpoch;const current=()=>epoch===sessionEpoch&&!!user;const pending=acceptPending;pending.add(ride.id);button.disabled=true;try{await api("/api/rides/"+ride.id+"/accept","POST",{});if(!current())return;await refresh();if(current())alertText("Viaje asignado.");}catch(e){if(current())alertText(e.message,true);}finally{pending.delete(ride.id);if(current())button.disabled=false;}});
         el.append(name,details,button);return el;
       });
       show("available-rides",cards,"No hay solicitudes abiertas.");
@@ -145,10 +146,12 @@
   }
   $("refresh").addEventListener("click",()=>refresh().catch(e=>alertText(e.message,true)));
   $("request-ride").addEventListener("click",async()=>{
-    if(!live||!coords.origin||!coords.destination)return;
-    $("request-ride").disabled=true;
-    try{await api("/api/rides","POST",{origin:coords.origin,destination:coords.destination});await refresh();alertText("Solicitud enviada al servidor del piloto.");}
-    catch(e){alertText(e.message,true);}finally{redraw();}
+    if(!user||!live||requestPending||!coords.origin||!coords.destination)return;
+    const epoch=sessionEpoch;
+    const current=()=>epoch===sessionEpoch&&!!user;
+    requestPending=true;redraw();
+    try{await api("/api/rides","POST",{origin:coords.origin,destination:coords.destination});if(!current())return;await refresh();if(current())alertText("Solicitud enviada al servidor del piloto.");}
+    catch(e){if(current())alertText(e.message,true);}finally{if(current()){requestPending=false;redraw();}}
   });
   $("driver-apply").addEventListener("click",async()=>{
     if(!user)return;
