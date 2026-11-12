@@ -197,14 +197,15 @@
     const button=$("verify-code");
     if(button.disabled||user||$("send-code").disabled)return;
     const epoch=sessionEpoch;
+    const email=$("email").value.trim(),code=$("access-code").value.trim();
+    const current=()=>epoch===sessionEpoch&&!user&&$("email").value.trim()===email&&$("access-code").value.trim()===code;
     button.disabled=true;
     try{
-      const email=$("email").value.trim(),code=$("access-code").value.trim();
       const r=await api("/api/auth/verify","POST",{email,code});
-      if(epoch!==sessionEpoch||user)return;
+      if(!current())return;
       token=r.token;sessionStorage.setItem("bm-viajes-pilot-token",token);
       $("access-code").value="";setUser(r.user);alertText("Acceso verificado.");
-    }catch(e){if(epoch===sessionEpoch&&!user)alertText(e.message,true);}
+    }catch(e){if(current())alertText(e.message,true);}
     finally{button.disabled=false;}
   });
   $("signout").addEventListener("click",async()=>{
