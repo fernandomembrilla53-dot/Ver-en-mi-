@@ -209,7 +209,9 @@ async function main(req,env){
  const ip=req.headers.get("CF-Connecting-IP")||"unknown";
  if(method==="POST"){
    if(!env.AUTH_SECRET||env.AUTH_SECRET.length<32)throw new ApiError("Autenticación segura pendiente de configuración.",503);
-   await rateLimit(env,"ip:"+await sha256(ip+"|"+env.AUTH_SECRET),60,3600000);
+   // GPS tiene un presupuesto separado: no agotar autenticación ni acciones del viaje.
+   const gpsPost=/^\/api\/rides\/[0-9a-f-]{36}\/location$/.test(path);
+   await rateLimit(env,(gpsPost?"gps-ip:":"ip:")+await sha256(ip+"|"+env.AUTH_SECRET),gpsPost?240:60,gpsPost?60000:3600000);
  }
  if(method==="POST"&&path==="/api/auth/start")return startAuth(req,env);
  if(method==="POST"&&path==="/api/auth/verify")return verifyAuth(req,env);
@@ -225,7 +227,12 @@ async function main(req,env){
    if(method==="GET"&&sub==="")return json({ok:true,ride:await rideAccess(env,user,id)});
    if(method==="POST"&&sub==="accept")return acceptRide(env,user,id);
    if(method==="POST"&&sub==="status")return rideStatus(req,env,user,id);
-   if(method==="POST"&&sub==="location")return driverPosition(req,env,user,id);
+   if(method==="POST"&&sub==="location"){
+     liveOnly(env);driverOnly(user);
+     // Hasta una actualización cada cinco segundos en promedio, por conductor.
+     await rateLimit(env,"gps-user:"+user.id,12,60000);
+     return driverPosition(req,env,user,id);
+   }
    if(method==="GET"&&sub==="location")return getDriverPosition(env,user,id);
  }
  return error("Ruta no encontrada.",404);
