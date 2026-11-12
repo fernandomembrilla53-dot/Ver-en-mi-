@@ -159,10 +159,13 @@
     catch(e){if(current())alertText(e.message,true);}finally{if(current()){requestPending=false;redraw();}}
   });
   $("driver-apply").addEventListener("click",async()=>{
-    if(!user)return;
+    const button=$("driver-apply");
+    if(!user||button.disabled)return;
+    button.disabled=true;
     const epoch=sessionEpoch;
     try{await api("/api/driver/apply","POST",{accept_review:true});if(epoch!==sessionEpoch||!user)return;const r=await api("/api/me");if(epoch!==sessionEpoch||!user)return;setUser(r.user);alertText("Solicitud de revisión registrada. No habilita viajes por sí sola.");}
     catch(e){if(epoch===sessionEpoch&&user)alertText(e.message,true);}
+    finally{if(epoch===sessionEpoch&&user)button.disabled=user.driver_status==="approved"||user.driver_status==="pending";}
   });
   function switchTab(next){
     tab=next;const pax=next==="passenger";
