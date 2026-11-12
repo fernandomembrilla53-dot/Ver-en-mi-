@@ -174,12 +174,18 @@
     }catch(e){alertText(e.message,true);}finally{$("send-code").disabled=!BASE;}
   });
   $("verify-code").addEventListener("click",async()=>{
+    const button=$("verify-code");
+    if(button.disabled||user)return;
+    const epoch=sessionEpoch;
+    button.disabled=true;
     try{
       const email=$("email").value.trim(),code=$("access-code").value.trim();
       const r=await api("/api/auth/verify","POST",{email,code});
+      if(epoch!==sessionEpoch||user)return;
       token=r.token;sessionStorage.setItem("bm-viajes-pilot-token",token);
       $("access-code").value="";setUser(r.user);alertText("Acceso verificado.");
-    }catch(e){alertText(e.message,true);}
+    }catch(e){if(epoch===sessionEpoch&&!user)alertText(e.message,true);}
+    finally{button.disabled=false;}
   });
   $("signout").addEventListener("click",async()=>{
     const button=$("signout");button.disabled=true;
