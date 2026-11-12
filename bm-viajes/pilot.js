@@ -179,6 +179,11 @@
   }
   $("tab-passenger").addEventListener("click",()=>switchTab("passenger"));
   $("tab-driver").addEventListener("click",()=>switchTab("driver"));
+  // A verification code belongs to the email for which it was requested.
+  $("email").addEventListener("input",()=>{
+    $("code-section").hidden=true;
+    $("access-code").value="";
+  });
   $("send-code").addEventListener("click",async()=>{
     const button=$("send-code");
     if(button.disabled||user||$("verify-code").disabled)return;
@@ -197,7 +202,7 @@
   });
   $("verify-code").addEventListener("click",async()=>{
     const button=$("verify-code");
-    if(button.disabled||user||$("send-code").disabled)return;
+    if(button.disabled||user||$("send-code").disabled||$("code-section").hidden)return;
     const epoch=sessionEpoch;
     const email=$("email").value.trim(),code=$("access-code").value.trim();
     const current=()=>epoch===sessionEpoch&&!user&&$("email").value.trim()===email&&$("access-code").value.trim()===code;
