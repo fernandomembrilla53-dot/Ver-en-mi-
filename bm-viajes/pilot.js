@@ -178,11 +178,20 @@
   $("tab-passenger").addEventListener("click",()=>switchTab("passenger"));
   $("tab-driver").addEventListener("click",()=>switchTab("driver"));
   $("send-code").addEventListener("click",async()=>{
+    const button=$("send-code");
+    if(button.disabled||user||$("verify-code").disabled)return;
+    const epoch=sessionEpoch;
+    const email=$("email").value.trim();
+    const current=()=>epoch===sessionEpoch&&!user&&$("email").value.trim()===email;
+    button.disabled=true;
+    $("code-section").hidden=true;
+    $("access-code").value="";
     try{
-      const email=$("email").value.trim();if(!email)throw Error("Ingresá el correo.");
-      $("send-code").disabled=true;await api("/api/auth/start","POST",{email});
+      if(!email)throw Error("Ingresá el correo.");
+      await api("/api/auth/start","POST",{email});
+      if(!current())return;
       $("code-section").hidden=false;alertText("Si el correo está habilitado, recibirá un código de 6 dígitos.");
-    }catch(e){alertText(e.message,true);}finally{$("send-code").disabled=!BASE;}
+    }catch(e){if(current())alertText(e.message,true);}finally{button.disabled=!BASE;}
   });
   $("verify-code").addEventListener("click",async()=>{
     const button=$("verify-code");
