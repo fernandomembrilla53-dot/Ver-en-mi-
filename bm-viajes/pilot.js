@@ -193,13 +193,14 @@
     const revoke=api("/api/auth/logout","POST");
     sessionEpoch++; // Invalidar respuestas de consultas y GPS pendientes.
     token="";sessionStorage.removeItem("bm-viajes-pilot-token");
-    coords={origin:null,destination:null};myRides=[];pick=null;redraw();setUser(null);
+    coords={origin:null,destination:null};myRides=[];pick=null;redraw();map?.setView(center,14);setUser(null);
+    const logoutEpoch=sessionEpoch;
     alertText("Sesión cerrada en este dispositivo. Confirmando revocación en el servidor.");
     try{
       await revoke;
-      alertText("Sesión cerrada y revocada en el servidor.");
+      if(logoutEpoch===sessionEpoch&&!user)alertText("Sesión cerrada y revocada en el servidor.");
     }catch(e){
-      alertText("Sesión local cerrada. No se pudo confirmar la revocación en el servidor; evitá reutilizar esta sesión en otro dispositivo.",true);
+      if(logoutEpoch===sessionEpoch&&!user)alertText("Sesión local cerrada. No se pudo confirmar la revocación en el servidor; evitá reutilizar esta sesión en otro dispositivo.",true);
     }finally{button.disabled=false;}
   });
   async function boot(){
