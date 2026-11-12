@@ -6,7 +6,7 @@
   const center=[-37.1515,-58.4859];
   let token=sessionStorage.getItem("bm-viajes-pilot-token")||"";
   let user=null,live=false,map=null,pick=null,markers={},line=null,coords={origin:null,destination:null},myRides=[],tab="passenger";
-  let pickupGeneration=0;
+  let pickupGeneration=0,authGeneration=0;
   let refreshTimer=null,sessionEpoch=0,refreshGeneration=0,requestPending=false,acceptPending=new Set();
   function alertText(message,bad=false){
     const el=$("pilot-alert");el.hidden=false;el.textContent=message;el.className="status"+(bad?" error":" success");
@@ -181,15 +181,16 @@
   $("tab-driver").addEventListener("click",()=>switchTab("driver"));
   // A verification code belongs to the email for which it was requested.
   $("email").addEventListener("input",()=>{
+    authGeneration++;
     $("code-section").hidden=true;
     $("access-code").value="";
   });
   $("send-code").addEventListener("click",async()=>{
     const button=$("send-code");
     if(button.disabled||user||$("verify-code").disabled)return;
-    const epoch=sessionEpoch;
+    const epoch=sessionEpoch,generation=authGeneration;
     const email=$("email").value.trim();
-    const current=()=>epoch===sessionEpoch&&!user&&$("email").value.trim()===email;
+    const current=()=>epoch===sessionEpoch&&generation===authGeneration&&!user&&$("email").value.trim()===email;
     button.disabled=true;
     $("code-section").hidden=true;
     $("access-code").value="";
@@ -203,9 +204,9 @@
   $("verify-code").addEventListener("click",async()=>{
     const button=$("verify-code");
     if(button.disabled||user||$("send-code").disabled||$("code-section").hidden)return;
-    const epoch=sessionEpoch;
+    const epoch=sessionEpoch,generation=authGeneration;
     const email=$("email").value.trim(),code=$("access-code").value.trim();
-    const current=()=>epoch===sessionEpoch&&!user&&$("email").value.trim()===email&&$("access-code").value.trim()===code;
+    const current=()=>epoch===sessionEpoch&&generation===authGeneration&&!user&&$("email").value.trim()===email&&$("access-code").value.trim()===code;
     button.disabled=true;
     try{
       const r=await api("/api/auth/verify","POST",{email,code});
