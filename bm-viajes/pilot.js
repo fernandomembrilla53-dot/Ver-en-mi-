@@ -6,6 +6,7 @@
   const center=[-37.1515,-58.4859];
   let token=sessionStorage.getItem("bm-viajes-pilot-token")||"";
   let user=null,live=false,map=null,pick=null,markers={},line=null,coords={origin:null,destination:null},myRides=[],tab="passenger";
+  let pickupGeneration=0;
   let refreshTimer=null,sessionEpoch=0,refreshGeneration=0,requestPending=false,acceptPending=new Set();
   function alertText(message,bad=false){
     const el=$("pilot-alert");el.hidden=false;el.textContent=message;el.className="status"+(bad?" error":" success");
@@ -77,18 +78,18 @@
       window.addEventListener("resize",()=>map?.invalidateSize(),{passive:true});
     }catch(e){alertText("Error cargando mapa.",true);}
   }
-  $("set-pickup").addEventListener("click",()=>{pick="origin";redraw();alertText("Tocá un punto en el mapa para marcar el origen A.");});
-  $("set-dropoff").addEventListener("click",()=>{pick="destination";redraw();alertText("Tocá un punto en el mapa para marcar el destino B.");});
+  $("set-pickup").addEventListener("click",()=>{pickupGeneration++;pick="origin";redraw();alertText("Tocá un punto en el mapa para marcar el origen A.");});
+  $("set-dropoff").addEventListener("click",()=>{pickupGeneration++;pick="destination";redraw();alertText("Tocá un punto en el mapa para marcar el destino B.");});
   $("gps-pickup").addEventListener("click",()=>{
     if(!user){alertText("Iniciá sesión antes de utilizar el GPS del piloto.",true);return;}
     if(!navigator.geolocation){alertText("GPS no disponible.",true);return;}
-    const epoch=sessionEpoch;
+    const epoch=sessionEpoch,generation=++pickupGeneration;
     navigator.geolocation.getCurrentPosition(p=>{
-      if(epoch!==sessionEpoch||!user)return; // Ignorar GPS pendiente tras cerrar sesión o cambiar de usuario.
+      if(epoch!==sessionEpoch||generation!==pickupGeneration||!user)return; // Ignorar GPS pendiente tras cerrar sesión o cambiar de usuario.
       setPoint("origin",{lat:p.coords.latitude,lng:p.coords.longitude});map?.setView([p.coords.latitude,p.coords.longitude],16);
       alertText("Tu ubicación quedó marcada solo en esta sesión, hasta que elijas enviar un viaje.");
     },()=>{
-      if(epoch===sessionEpoch&&user)alertText("No se obtuvo permiso de GPS. Podés señalar el lugar en el mapa.",true);
+      if(epoch===sessionEpoch&&generation===pickupGeneration&&user)alertText("No se obtuvo permiso de GPS. Podés señalar el lugar en el mapa.",true);
     },{enableHighAccuracy:true,timeout:15000,maximumAge:10000});
   });
   function rideCard(ride,asDriver){
