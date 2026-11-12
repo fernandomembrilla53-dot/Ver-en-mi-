@@ -171,6 +171,8 @@ async function driverPosition(req,env,user,id){
  return json({ok:true,updated_at:now});
 }
 async function getDriverPosition(env,user,id){
+ // The emergency stop also disables disclosure of previously shared GPS positions.
+ liveOnly(env);
  const ride=await rideAccess(env,user,id);
  if(!["accepted","in_progress"].includes(ride.status))return json({ok:true,position:null});
  // Comprobar el estado del viaje en la misma lectura: nunca devolver GPS tras una cancelación concurrente.
