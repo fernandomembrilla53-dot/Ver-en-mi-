@@ -9,10 +9,27 @@ const safeEmail=(x)=>typeof x==="string"&&x.length<=254&&/^[^@\s]+@[^@\s]+\.[^@\
 const sha256=async(value)=>Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(value)))).map(x=>x.toString(16).padStart(2,"0")).join("");
 const randomHex=(length=32)=>Array.from(crypto.getRandomValues(new Uint8Array(length))).map(x=>x.toString(16).padStart(2,"0")).join("");
 const jsonInput=async(request)=>{
-  if(!(request.headers.get("Content-Type")||"").includes("application/json"))throw new ApiError("Enviá JSON.",415);
-  const raw=await request.text();
-  if(raw.length>6000)throw new ApiError("Solicitud demasiado grande.",413);
-  try{return JSON.parse(raw);}catch(e){throw new ApiError("JSON incorrecto.",400);}
+  if((request.headers.get("Content-Type")||"").split(";")[0].trim().toLowerCase()!=="application/json")throw new ApiError("Enviá JSON.",415);
+  const limit=6000;
+  const declared=request.headers.get("Content-Length");
+  if(declared!==null&&Number(declared)>limit)throw new ApiError("Solicitud demasiado grande.",413);
+  if(!request.body)throw new ApiError("JSON incorrecto.",400);
+  const reader=request.body.getReader(),decoder=new TextDecoder("utf-8",{fatal:true});
+  let size=0,raw="";
+  try{
+    while(true){
+      const {done,value}=await reader.read();
+      if(done)break;
+      size+=value.byteLength;
+      if(size>limit){await reader.cancel().catch(()=>{});throw new ApiError("Solicitud demasiado grande.",413);}
+      raw+=decoder.decode(value,{stream:true});
+    }
+    raw+=decoder.decode();
+    const data=JSON.parse(raw);
+    if(!data||typeof data!=="object"||Array.isArray(data))throw new ApiError("Enviá un objeto JSON.",400);
+    return data;
+  }catch(e){if(e instanceof ApiError)throw e;throw new ApiError("JSON incorrecto.",400);}
+  finally{reader.releaseLock();}
 };
 class ApiError extends Error{constructor(message,status){super(message);this.status=status;}}
 function haversine(a,b){
