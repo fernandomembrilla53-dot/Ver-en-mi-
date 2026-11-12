@@ -175,7 +175,7 @@
   });
   $("verify-code").addEventListener("click",async()=>{
     const button=$("verify-code");
-    if(button.disabled||user)return;
+    if(button.disabled||user||$("send-code").disabled)return;
     const epoch=sessionEpoch;
     button.disabled=true;
     try{
@@ -208,8 +208,13 @@
       const r=await api("/api/config");
       live=!!r.live_rides_enabled;$("pilot-api-mode").textContent=live?"Piloto habilitado":"Solo pruebas";
       serverStatus(live?"Servidor disponible para el piloto de conductores verificados. Sin pagos integrados.":"Servidor conectado, viajes reales deshabilitados hasta aprobar seguridad y documentación.","success");
+      // Restore the saved session before allowing a new authentication attempt.
+      if(token){
+        const epoch=sessionEpoch;
+        try{const data=await api("/api/me");if(epoch===sessionEpoch&&!user)setUser(data.user);}
+        catch(e){if(epoch===sessionEpoch&&!user){token="";sessionStorage.removeItem("bm-viajes-pilot-token");}}
+      }
       $("send-code").disabled=false;
-      if(token){try{const data=await api("/api/me");setUser(data.user);}catch(e){token="";sessionStorage.removeItem("bm-viajes-pilot-token");}}
       redraw();
     }catch(e){serverStatus("No se pudo conectar al servidor: "+e.message,"error");}
   }
