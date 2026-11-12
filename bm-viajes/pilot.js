@@ -204,6 +204,9 @@
     const revoke=api("/api/auth/logout","POST");
     sessionEpoch++; // Invalidar respuestas de consultas y GPS pendientes.
     token="";sessionStorage.removeItem("bm-viajes-pilot-token");
+    // Do not expose the previous account or its authentication code on a shared device.
+    $("email").value="";$("access-code").value="";$("code-section").hidden=true;
+    switchTab("passenger");
     coords={origin:null,destination:null};myRides=[];pick=null;redraw();map?.setView(center,14);setUser(null);
     const logoutEpoch=sessionEpoch;
     alertText("Sesión cerrada en este dispositivo. Confirmando revocación en el servidor.");
