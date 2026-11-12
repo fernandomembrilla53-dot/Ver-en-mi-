@@ -184,8 +184,8 @@ async function driverPosition(req,env,user,id){
  const body=await jsonInput(req),p=coords({position:body?.position},"position"),accuracy=body?.accuracy_m;
  if(!Number.isFinite(accuracy)||accuracy<0||accuracy>300)throw new ApiError("GPS insuficientemente preciso.",400);
  const now=Date.now();
- // Validar la asignación en la misma escritura: una cancelación concurrente no debe reactivar el GPS.
- const saved=await env.DB.prepare("INSERT INTO ride_positions(ride_id,driver_id,lat,lng,accuracy_m,updated_at) SELECT id,driver_id,?,?,?,? FROM rides WHERE id=? AND driver_id=? AND status IN ('accepted','in_progress') ON CONFLICT(ride_id) DO UPDATE SET lat=excluded.lat,lng=excluded.lng,accuracy_m=excluded.accuracy_m,updated_at=excluded.updated_at WHERE EXISTS (SELECT 1 FROM rides WHERE id=excluded.ride_id AND driver_id=excluded.driver_id AND status IN ('accepted','in_progress'))").bind(p.lat,p.lng,accuracy,now,id,user.id).run();
+ // Revalidar asignación y aprobación en la escritura: cancelación o suspensión concurrente bloquean el GPS.
+ const saved=await env.DB.prepare("INSERT INTO ride_positions(ride_id,driver_id,lat,lng,accuracy_m,updated_at) SELECT id,driver_id,?,?,?,? FROM rides WHERE id=? AND driver_id=? AND status IN ('accepted','in_progress') AND EXISTS (SELECT 1 FROM users WHERE id=rides.driver_id AND driver_status='approved') ON CONFLICT(ride_id) DO UPDATE SET lat=excluded.lat,lng=excluded.lng,accuracy_m=excluded.accuracy_m,updated_at=excluded.updated_at WHERE EXISTS (SELECT 1 FROM rides JOIN users ON users.id=rides.driver_id WHERE rides.id=excluded.ride_id AND rides.driver_id=excluded.driver_id AND rides.status IN ('accepted','in_progress') AND users.driver_status='approved')").bind(p.lat,p.lng,accuracy,now,id,user.id).run();
  if(!saved.meta?.changes)throw new ApiError("El viaje ya no está activo. No se guardó la ubicación.",409);
  return json({ok:true,updated_at:now});
 }
