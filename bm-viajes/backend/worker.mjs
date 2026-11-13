@@ -143,7 +143,7 @@ async function myRides(env,user){
 }
 async function openRides(env,user){
  driverOnly(user);liveOnly(env);
- const result=await env.DB.prepare("SELECT id,origin_lat,origin_lng,destination_lat,destination_lng,distance_air_km,created_at FROM rides WHERE status='requested' AND expires_at>? ORDER BY created_at LIMIT 20").bind(Date.now()).all();
+ const result=await env.DB.prepare("SELECT id,origin_lat,origin_lng,destination_lat,destination_lng,distance_air_km,created_at FROM rides WHERE status='requested' AND expires_at>? AND rider_id<>? AND EXISTS (SELECT 1 FROM users WHERE id=? AND driver_status='approved') ORDER BY created_at LIMIT 20").bind(Date.now(),user.id,user.id).all();
  const rides=(result.results||[]).map(r=>({id:r.id,origin:{lat:Number(r.origin_lat.toFixed(3)),lng:Number(r.origin_lng.toFixed(3))},destination_area:{lat:Number(r.destination_lat.toFixed(3)),lng:Number(r.destination_lng.toFixed(3))},distance_air_km:r.distance_air_km,created_at:r.created_at}));
  return json({ok:true,rides});
 }
