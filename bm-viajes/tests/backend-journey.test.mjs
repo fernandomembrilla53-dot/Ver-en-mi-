@@ -266,3 +266,35 @@ test('fare insert failure rolls back ride; direct trips cannot start waiting', a
   assert.equal(done.financials.total_ars,4000);
   assert.equal(done.financials.commission_ars,400);
 });
+
+test('cash requires both participants, posts exactly one immutable commission and rolls back on failure', async t => {
+  t.mock.method(Date,'now',()=>Date.parse('2026-11-13T15:00:00Z'));
+  const f=fixture(t), {api,DB}=f, {rider,driver}=await f.participants();
+  const outsider=await f.login('outsider');
+  const {ride_id:id}=await api('POST','/rides',rider.token,route,201);
+  const path=`/rides/${id}/cash`;
+  await api('POST',path,rider.token,{confirm:true},409);
+  await api('POST',`/rides/${id}/accept`,driver.token);
+  await api('POST',`/rides/${id}/status`,driver.token,{status:'in_progress'});
+  await api('POST',`/rides/${id}/status`,driver.token,{status:'completed'});
+  await api('POST',path,outsider.token,{confirm:true},403);
+  await api('POST',path,rider.token,{confirm:true,amount:1},400);
+  assert.equal((await api('POST',path,rider.token,{confirm:true})).payment.status,'awaiting_counterparty');
+  assert.equal((await api('POST',path,rider.token,{confirm:true})).payment.confirmations,1);
+  assert.equal((await api('GET','/driver/ledger',driver.token)).commission_due_ars,0);
+  await DB.prepare("CREATE TRIGGER fail_ledger BEFORE INSERT ON driver_ledger BEGIN SELECT RAISE(ABORT,'injected'); END").run();
+  await api('POST',path,driver.token,{confirm:true},500);
+  assert.equal((await api('GET',path,rider.token)).payment.confirmations,1);
+  await DB.prepare('DROP TRIGGER fail_ledger').run();
+  assert.equal((await api('POST',path,driver.token,{confirm:true})).payment.status,'confirmed');
+  assert.equal((await api('POST',path,driver.token,{confirm:true})).payment.confirmations,2);
+  const ledger=await api('GET','/driver/ledger',driver.token);
+  assert.equal(ledger.commission_due_ars,400);
+  assert.equal(ledger.entries.length,1);
+  assert.equal(ledger.entries[0].ride_id,id);
+  assert.equal((await api('GET','/driver/ledger',outsider.token)).commission_due_ars,0);
+  await assert.rejects(DB.prepare('UPDATE driver_ledger SET amount_ars=0 WHERE ride_id=?').bind(id).run());
+  await assert.rejects(DB.prepare('DELETE FROM driver_ledger WHERE ride_id=?').bind(id).run());
+  await assert.rejects(DB.prepare('DELETE FROM cash_confirmations WHERE ride_id=?').bind(id).run());
+  assert.equal((await api('GET','/config')).payments_enabled,false);
+});
