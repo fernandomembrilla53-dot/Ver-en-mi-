@@ -198,6 +198,28 @@ async function rideWait(req,env,user,id){
 async function rideFinancials(env,id){
  return await env.DB.prepare("SELECT f.kind,f.tariff_version,f.base_ars,f.commission_bps,f.wait_free_seconds,f.wait_minute_ars,w.started_at,w.ended_at,t.wait_seconds,t.waiting_ars,t.total_ars,t.commission_ars,t.finalized_at FROM ride_fares f LEFT JOIN ride_waits w ON w.ride_id=f.ride_id LEFT JOIN ride_totals t ON t.ride_id=f.ride_id WHERE f.ride_id=?").bind(id).first();
 }
+async function cashStatus(env,id){
+ const row=await env.DB.prepare("SELECT COUNT(*) AS confirmations FROM cash_confirmations WHERE ride_id=?").bind(id).first();
+ return {method:"cash",status:row.confirmations===2?"confirmed":row.confirmations===1?"awaiting_counterparty":"unconfirmed",confirmations:row.confirmations};
+}
+async function confirmCash(req,env,user,id){
+ const data=await jsonInput(req);
+ if(data.confirm!==true||Object.keys(data).some(k=>k!=="confirm"))throw new ApiError("Confirmá el pago en efectivo.",400);
+ const ride=await rideAccess(env,user,id);
+ if(ride.status!=="completed")throw new ApiError("El viaje todavía no está finalizado.",409);
+ const role=ride.rider_id===user.id?"rider":"driver";
+ const result=await env.DB.prepare("INSERT INTO cash_confirmations(ride_id,role,user_id,confirmed_at) SELECT r.id,?,?,? FROM rides r JOIN ride_totals t ON t.ride_id=r.id WHERE r.id=? AND r.status='completed' AND ((?='rider' AND r.rider_id=?) OR (?='driver' AND r.driver_id=?)) ON CONFLICT(ride_id,role) DO NOTHING").bind(role,user.id,Date.now(),id,role,user.id,role,user.id).run();
+ if(!result.meta?.changes){
+   const existing=await env.DB.prepare("SELECT user_id FROM cash_confirmations WHERE ride_id=? AND role=?").bind(id,role).first();
+   if(existing?.user_id!==user.id)throw new ApiError("No hay importe final disponible.",409);
+ }
+ return json({ok:true,payment:await cashStatus(env,id)});
+}
+async function driverLedger(env,user){
+ const balance=await env.DB.prepare("SELECT COALESCE(SUM(amount_ars),0) AS commission_due_ars FROM driver_ledger WHERE driver_id=?").bind(user.id).first();
+ const entries=await env.DB.prepare("SELECT id,ride_id,kind,amount_ars,created_at FROM driver_ledger WHERE driver_id=? ORDER BY created_at DESC,id DESC LIMIT 100").bind(user.id).all();
+ return json({ok:true,currency:"ARS",commission_due_ars:balance.commission_due_ars,entries:entries.results||[],settlements_enabled:false});
+}
 async function rideStatus(req,env,user,id){
  liveOnly(env);
  const data=await jsonInput(req),next=data?.status,ride=await rideAccess(env,user,id),now=Date.now();
@@ -283,13 +305,16 @@ async function main(req,env){
  const user=await authenticate(req,env);
  if(method==="GET"&&path==="/api/me")return json({ok:true,user});
  if(method==="POST"&&path==="/api/driver/apply")return applyDriver(req,env,user);
+ if(method==="GET"&&path==="/api/driver/ledger")return driverLedger(env,user);
  if(method==="GET"&&path==="/api/rides/mine")return myRides(env,user);
  if(method==="GET"&&path==="/api/rides/open")return openRides(env,user);
  if(method==="POST"&&path==="/api/rides")return newRide(req,env,user);
- const match=path.match(/^\/api\/rides\/([0-9a-f-]{36})(?:\/(accept|status|location|wait))?$/);
+ const match=path.match(/^\/api\/rides\/([0-9a-f-]{36})(?:\/(accept|status|location|wait|cash))?$/);
  if(match){
    const id=match[1],sub=match[2]||"";
    if(method==="GET"&&sub===""){const ride=visibleRide(await rideAccess(env,user,id));return json({ok:true,ride,financials:await rideFinancials(env,id)});}
+   if(method==="POST"&&sub==="cash")return confirmCash(req,env,user,id);
+   if(method==="GET"&&sub==="cash"){await rideAccess(env,user,id);return json({ok:true,payment:await cashStatus(env,id)});}
    if(method==="POST"&&sub==="wait")return rideWait(req,env,user,id);
    if(method==="POST"&&sub==="accept")return acceptRide(env,user,id);
    if(method==="POST"&&sub==="status")return rideStatus(req,env,user,id);
