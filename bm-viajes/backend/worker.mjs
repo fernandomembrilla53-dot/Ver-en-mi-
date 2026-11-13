@@ -181,6 +181,23 @@ async function acceptRide(env,user,id){
  if(!result.meta?.changes)throw new ApiError("El pedido ya fue aceptado, venció o tenés otro viaje activo.",409);
  return json({ok:true,status:"accepted"});
 }
+// Un único intervalo de espera por ida y vuelta, controlado por el reloj del servidor.
+async function rideWait(req,env,user,id){
+ liveOnly(env);
+ const data=await jsonInput(req),action=data.action;
+ if(!["start","stop"].includes(action)||Object.keys(data).some(k=>k!=="action"))throw new ApiError("Acción de espera inválida.",400);
+ const ride=await rideAccess(env,user,id);
+ if(ride.driver_id!==user.id)throw new ApiError("Solo el conductor asignado puede controlar la espera.",403);
+ const now=Date.now();
+ const change=action==="start"
+  ?await env.DB.prepare("INSERT INTO ride_waits(ride_id,started_at) SELECT r.id,? FROM rides r JOIN ride_fares f ON f.ride_id=r.id JOIN users u ON u.id=r.driver_id WHERE r.id=? AND r.driver_id=? AND r.status='in_progress' AND f.kind='round_trip' AND u.driver_status='approved' ON CONFLICT(ride_id) DO NOTHING").bind(now,id,user.id).run()
+  :await env.DB.prepare("UPDATE ride_waits SET ended_at=MAX(started_at,?) WHERE ride_id=? AND ended_at IS NULL AND EXISTS (SELECT 1 FROM rides WHERE id=? AND driver_id=? AND status='in_progress')").bind(now,id,id,user.id).run();
+ if(!change.meta?.changes)throw new ApiError("La espera no se puede modificar en este estado.",409);
+ return json({ok:true,wait:await env.DB.prepare("SELECT started_at,ended_at FROM ride_waits WHERE ride_id=?").bind(id).first()});
+}
+async function rideFinancials(env,id){
+ return await env.DB.prepare("SELECT f.kind,f.tariff_version,f.base_ars,f.commission_bps,f.wait_free_seconds,f.wait_minute_ars,w.started_at,w.ended_at,t.wait_seconds,t.waiting_ars,t.total_ars,t.commission_ars,t.finalized_at FROM ride_fares f LEFT JOIN ride_waits w ON w.ride_id=f.ride_id LEFT JOIN ride_totals t ON t.ride_id=f.ride_id WHERE f.ride_id=?").bind(id).first();
+}
 async function rideStatus(req,env,user,id){
  liveOnly(env);
  const data=await jsonInput(req),next=data?.status,ride=await rideAccess(env,user,id),now=Date.now();
@@ -195,12 +212,18 @@ async function rideStatus(req,env,user,id){
  // D1 batch es transaccional: si falla el borrado GPS, también se revierte el cierre.
  // La condición evita borrar GPS de un viaje que cambió concurrentemente a un estado activo.
  const terminal=next==="completed"||next==="cancelled";
- const result=terminal?(await env.DB.batch([
-   update,
-   env.DB.prepare("DELETE FROM ride_positions WHERE ride_id=? AND EXISTS (SELECT 1 FROM rides WHERE id=? AND status IN ('completed','cancelled'))").bind(id,id)
- ]))[0]:await update.run();
+ const statements=[update];
+ if(terminal){
+   statements.push(env.DB.prepare("DELETE FROM ride_positions WHERE ride_id=? AND EXISTS (SELECT 1 FROM rides WHERE id=? AND status IN ('completed','cancelled'))").bind(id,id));
+ }
+ if(next==="completed"){
+   // Close an open wait at completion. Limit the pilot's billable wait to 24h.
+   statements.push(env.DB.prepare("UPDATE ride_waits SET ended_at=MAX(started_at,?) WHERE ride_id=? AND ended_at IS NULL AND EXISTS (SELECT 1 FROM rides WHERE id=? AND status='completed' AND updated_at=?)").bind(now,id,id,now));
+   statements.push(env.DB.prepare("INSERT INTO ride_totals(ride_id,wait_seconds,waiting_ars,total_ars,commission_ars,finalized_at) SELECT ride_id,seconds,waiting,base_ars+waiting,CAST(((base_ars+waiting)*commission_bps+5000)/10000 AS INTEGER),? FROM (SELECT *,CAST((MAX(0,seconds-wait_free_seconds)+59)/60 AS INTEGER)*wait_minute_ars AS waiting FROM (SELECT f.*,MIN(86400,MAX(0,CAST((COALESCE(w.ended_at,w.started_at,0)-COALESCE(w.started_at,0)+999)/1000 AS INTEGER))) AS seconds FROM ride_fares f JOIN rides r ON r.id=f.ride_id LEFT JOIN ride_waits w ON w.ride_id=f.ride_id WHERE r.id=? AND r.status='completed' AND r.updated_at=?)) ON CONFLICT(ride_id) DO NOTHING").bind(now,id,now));
+ }
+ const result=terminal?(await env.DB.batch(statements))[0]:await update.run();
  if(!result.meta?.changes)throw new ApiError("El viaje cambió de estado. Actualizá.",409);
- return json({ok:true,status:next});
+ return json({ok:true,status:next,...(next==="completed"?{financials:await rideFinancials(env,id)}:{})});
 }
 async function driverPosition(req,env,user,id){
  liveOnly(env);driverOnly(user);
@@ -263,10 +286,11 @@ async function main(req,env){
  if(method==="GET"&&path==="/api/rides/mine")return myRides(env,user);
  if(method==="GET"&&path==="/api/rides/open")return openRides(env,user);
  if(method==="POST"&&path==="/api/rides")return newRide(req,env,user);
- const match=path.match(/^\/api\/rides\/([0-9a-f-]{36})(?:\/(accept|status|location))?$/);
+ const match=path.match(/^\/api\/rides\/([0-9a-f-]{36})(?:\/(accept|status|location|wait))?$/);
  if(match){
    const id=match[1],sub=match[2]||"";
-   if(method==="GET"&&sub==="")return json({ok:true,ride:visibleRide(await rideAccess(env,user,id))});
+   if(method==="GET"&&sub===""){const ride=visibleRide(await rideAccess(env,user,id));return json({ok:true,ride,financials:await rideFinancials(env,id)});}
+   if(method==="POST"&&sub==="wait")return rideWait(req,env,user,id);
    if(method==="POST"&&sub==="accept")return acceptRide(env,user,id);
    if(method==="POST"&&sub==="status")return rideStatus(req,env,user,id);
    if(method==="POST"&&sub==="location"){
