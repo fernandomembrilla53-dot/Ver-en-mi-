@@ -1,4 +1,4 @@
-import { estimateUrbanFare } from "./tariff.mjs";
+import { estimateUrbanFare, TARIFF } from "./tariff.mjs";
 // BM Viajes - API piloto Cloudflare Workers + D1.
 // Falla cerrado: sin ENABLE_LIVE_RIDES=true no acepta viajes reales.
 // No incluye cobros: nunca simular un pago exitoso.
@@ -140,9 +140,14 @@ async function newRide(req,env,user){
  // La comprobación atómica impide dos solicitudes paralelas y viajar como pasajero mientras se conduce.
  // Un viaje aceptado o en curso sigue activo aunque venza el plazo original de solicitud.
  const now=Date.now(),id=crypto.randomUUID();
- const inserted=await env.DB.prepare("INSERT INTO rides(id,rider_id,origin_lat,origin_lng,destination_lat,destination_lng,distance_air_km,status,created_at,updated_at,expires_at) SELECT ?,?,?,?,?,?,?,'requested',?,?,? WHERE NOT EXISTS (SELECT 1 FROM rides WHERE (rider_id=? AND (status IN ('accepted','in_progress') OR (status='requested' AND expires_at>?))) OR (driver_id=? AND status IN ('accepted','in_progress')))").bind(id,user.id,a.lat,a.lng,b.lat,b.lng,Number(air.toFixed(2)),now,now,now+15*60000,user.id,now,user.id).run();
+ const kind=input.kind??"one_way";
+ const night=Number(new Intl.DateTimeFormat("en-GB",{timeZone:"America/Argentina/Buenos_Aires",hour:"2-digit",hourCycle:"h23"}).format(new Date(now)));
+ let fare;try{fare=estimateUrbanFare({kind,night:night>=22||night<6});}catch(e){if(e instanceof RangeError)throw new ApiError("Modalidad sin tarifa definida.",400);throw e;}
+ const insertRide=env.DB.prepare("INSERT INTO rides(id,rider_id,origin_lat,origin_lng,destination_lat,destination_lng,distance_air_km,status,created_at,updated_at,expires_at) SELECT ?,?,?,?,?,?,?,'requested',?,?,? WHERE NOT EXISTS (SELECT 1 FROM rides WHERE (rider_id=? AND (status IN ('accepted','in_progress') OR (status='requested' AND expires_at>?))) OR (driver_id=? AND status IN ('accepted','in_progress')))").bind(id,user.id,a.lat,a.lng,b.lat,b.lng,Number(air.toFixed(2)),now,now,now+15*60000,user.id,now,user.id);
+ const insertFare=env.DB.prepare("INSERT INTO ride_fares(ride_id,kind,tariff_version,base_ars,commission_bps,wait_free_seconds,wait_minute_ars,created_at) SELECT id,?,?,?,?,?,?,? FROM rides WHERE id=?").bind(kind,fare.version,fare.base,TARIFF.commissionPercent*100,kind==="round_trip"?TARIFF.freeWaitSeconds:0,kind==="round_trip"?TARIFF.waitPerMinute:0,now,id);
+ const [inserted]=await env.DB.batch([insertRide,insertFare]);
  if(!inserted.meta?.changes)throw new ApiError("Ya tenés un viaje activo. Terminá o cancelá ese pedido.",409);
- return json({ok:true,ride_id:id,status:"requested",distance_air_km:Number(air.toFixed(2)),fare_ars:null,payment_status:"not_implemented",message:"Sin tarifa ni pago confirmado. Coordinación de prueba sujeta a habilitación."},201);
+ return json({ok:true,ride_id:id,status:"requested",distance_air_km:Number(air.toFixed(2)),fare_ars:fare.base,payment_status:"not_implemented",message:"Tarifa base de piloto guardada; sin pago confirmado."},201);
 }
 // Un pedido vencido no debe aparecer activo mientras espera la limpieza programada.
 // No alterar viajes aceptados o en curso: expires_at solo limita la solicitud inicial.
