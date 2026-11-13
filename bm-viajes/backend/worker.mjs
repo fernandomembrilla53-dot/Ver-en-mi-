@@ -231,7 +231,14 @@ async function main(req,env){
    catch(e){if(e instanceof RangeError)throw new ApiError("Modalidad o espera no admitida.",400);throw e;}
  }
  if(!env?.DB)throw new ApiError("Base de datos no configurada.",503);
- if(method==="GET"&&path==="/api/health")return json({ok:true,service:"BM Viajes",mode:env.ENABLE_LIVE_RIDES==="true"?"pilot":"demo"});
+ if(method==="GET"&&path==="/api/health"){
+   // Comprobar conectividad y presencia de tablas sin leer datos personales.
+   try{
+     const ready=await env.DB.prepare("SELECT COUNT(*) AS ready_tables FROM sqlite_master WHERE type='table' AND name IN ('users','otp_challenges','sessions','rate_limits','rides','ride_positions')").first();
+     if(ready?.ready_tables!==6)throw new Error("Schema incomplete");
+   }catch(e){throw new ApiError("Base de datos no disponible o esquema incompleto.",503);}
+   return json({ok:true,service:"BM Viajes",mode:env.ENABLE_LIVE_RIDES==="true"?"pilot":"demo",database:"ready"});
+ }
  if(method==="GET"&&path==="/api/config")return json({ok:true,live_rides_enabled:env.ENABLE_LIVE_RIDES==="true",payments_enabled:false,area:"Ayacucho",fare_calculation:"pending_municipal_tariffs"});
  // La revocación debe seguir disponible incluso con el límite general de POST agotado.
  // La eliminación se limita al hash del token y no crea sesiones ni viajes.
