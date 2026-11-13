@@ -213,3 +213,56 @@ test('scheduled cleanup expires a pending request without waiting in real time',
   assert.equal((await api('GET', `/rides/${id}`, rider.token)).ride.status, 'cancelled');
   await api('POST', '/rides', rider.token, route, 201);
 });
+
+test('round-trip wait uses server time; final fare is immutable and atomic', async t => {
+  let now=Date.parse('2026-11-13T15:00:00Z');
+  t.mock.method(Date,'now',()=>now);
+  const f=fixture(t), {api,DB}=f, {rider,driver}=await f.participants();
+  const outsider=await f.login('outsider');
+  const result=await api('POST','/rides',rider.token,{...route,kind:'round_trip'},201);
+  const id=result.ride_id;
+  assert.equal(result.fare_ars,6000);
+  const snapshot=await DB.prepare('SELECT * FROM ride_fares WHERE ride_id=?').bind(id).first();
+  assert.equal(snapshot.base_ars,6000); assert.equal(snapshot.commission_bps,1000);
+  await api('POST',`/rides/${id}/accept`,driver.token);
+  await api('POST',`/rides/${id}/wait`,driver.token,{action:'start'},409);
+  await api('POST',`/rides/${id}/status`,driver.token,{status:'in_progress'});
+  await api('POST',`/rides/${id}/wait`,rider.token,{action:'start'},403);
+  await api('POST',`/rides/${id}/wait`,outsider.token,{action:'start'},403);
+  await api('POST',`/rides/${id}/wait`,driver.token,{action:'start',seconds:600},400);
+  await api('POST',`/rides/${id}/wait`,driver.token,{action:'start'});
+  await api('POST',`/rides/${id}/wait`,driver.token,{action:'start'},409);
+  now+=600000;
+  await DB.prepare("CREATE TRIGGER fail_total BEFORE INSERT ON ride_totals BEGIN SELECT RAISE(ABORT,'injected'); END").run();
+  await api('POST',`/rides/${id}/status`,driver.token,{status:'completed'},500);
+  assert.equal((await api('GET',`/rides/${id}`,rider.token)).ride.status,'in_progress');
+  assert.equal((await DB.prepare('SELECT ended_at FROM ride_waits WHERE ride_id=?').bind(id).first()).ended_at,null);
+  await DB.prepare('DROP TRIGGER fail_total').run();
+  const completed=await api('POST',`/rides/${id}/status`,driver.token,{status:'completed'});
+  assert.equal(completed.financials.wait_seconds,600);
+  assert.equal(completed.financials.waiting_ars,1250);
+  assert.equal(completed.financials.total_ars,7250);
+  assert.equal(completed.financials.commission_ars,725);
+  now+=60000;
+  await api('POST',`/rides/${id}/status`,driver.token,{status:'completed'},409);
+  await api('POST',`/rides/${id}/wait`,driver.token,{action:'stop'},409);
+  assert.equal((await api('GET',`/rides/${id}`,rider.token)).financials.total_ars,7250);
+  await api('GET',`/rides/${id}`,outsider.token,undefined,403);
+  assert.equal((await api('GET','/config')).payments_enabled,false);
+});
+
+test('fare insert failure rolls back ride; direct trips cannot start waiting', async t => {
+  t.mock.method(Date,'now',()=>Date.parse('2026-11-13T15:00:00Z'));
+  const f=fixture(t), {api,DB}=f, {rider,driver}=await f.participants();
+  await DB.prepare("CREATE TRIGGER fail_fare BEFORE INSERT ON ride_fares BEGIN SELECT RAISE(ABORT,'injected'); END").run();
+  await api('POST','/rides',rider.token,route,500);
+  assert.equal((await DB.prepare('SELECT COUNT(*) AS n FROM rides').first()).n,0);
+  await DB.prepare('DROP TRIGGER fail_fare').run();
+  const {ride_id:id}=await api('POST','/rides',rider.token,route,201);
+  await api('POST',`/rides/${id}/accept`,driver.token);
+  await api('POST',`/rides/${id}/status`,driver.token,{status:'in_progress'});
+  await api('POST',`/rides/${id}/wait`,driver.token,{action:'start'},409);
+  const done=await api('POST',`/rides/${id}/status`,driver.token,{status:'completed'});
+  assert.equal(done.financials.total_ars,4000);
+  assert.equal(done.financials.commission_ars,400);
+});
