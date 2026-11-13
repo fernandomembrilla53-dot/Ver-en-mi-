@@ -144,9 +144,15 @@ async function newRide(req,env,user){
  if(!inserted.meta?.changes)throw new ApiError("Ya tenés un viaje activo. Terminá o cancelá ese pedido.",409);
  return json({ok:true,ride_id:id,status:"requested",distance_air_km:Number(air.toFixed(2)),fare_ars:null,payment_status:"not_implemented",message:"Sin tarifa ni pago confirmado. Coordinación de prueba sujeta a habilitación."},201);
 }
+// Un pedido vencido no debe aparecer activo mientras espera la limpieza programada.
+// No alterar viajes aceptados o en curso: expires_at solo limita la solicitud inicial.
+function visibleRide(ride,now=Date.now()){
+ return ride.status==="requested"&&ride.expires_at<=now?{...ride,status:"cancelled"}:ride;
+}
 async function myRides(env,user){
- const result=await env.DB.prepare("SELECT id,status,rider_id,driver_id,origin_lat,origin_lng,destination_lat,destination_lng,created_at,updated_at FROM rides WHERE rider_id=? OR driver_id=? ORDER BY created_at DESC LIMIT 30").bind(user.id,user.id).all();
- return json({ok:true,rides:result.results||[]});
+ const result=await env.DB.prepare("SELECT id,status,rider_id,driver_id,origin_lat,origin_lng,destination_lat,destination_lng,created_at,updated_at,expires_at FROM rides WHERE rider_id=? OR driver_id=? ORDER BY created_at DESC LIMIT 30").bind(user.id,user.id).all();
+ const now=Date.now();
+ return json({ok:true,rides:(result.results||[]).map(ride=>visibleRide(ride,now))});
 }
 async function openRides(env,user){
  driverOnly(user);liveOnly(env);
@@ -247,7 +253,7 @@ async function main(req,env){
  const match=path.match(/^\/api\/rides\/([0-9a-f-]{36})(?:\/(accept|status|location))?$/);
  if(match){
    const id=match[1],sub=match[2]||"";
-   if(method==="GET"&&sub==="")return json({ok:true,ride:await rideAccess(env,user,id)});
+   if(method==="GET"&&sub==="")return json({ok:true,ride:visibleRide(await rideAccess(env,user,id))});
    if(method==="POST"&&sub==="accept")return acceptRide(env,user,id);
    if(method==="POST"&&sub==="status")return rideStatus(req,env,user,id);
    if(method==="POST"&&sub==="location"){
