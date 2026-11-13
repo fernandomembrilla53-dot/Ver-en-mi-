@@ -24,7 +24,7 @@ La aplicación pública está en `../index.html` y funciona como **demo**. La AP
 
 `GET /api/fare/estimate?kind=one_way` devuelve $4.000 ARS; `kind=round_trip` devuelve $6.000; `kind=one_way&night=true` devuelve $4.500. Para ida y vuelta, `waitSeconds=600` devuelve $7.250: cinco minutos gratuitos y $250 por minuto adicional iniciado. Comisión: 10%. La respuesta incluye `simulationOnly: true` y versión del tarifario.
 
-La ruta requiere que exista el binding DB, pero no consulta la base. No requiere sesión, no crea viajes ni activa pagos. Rechaza parámetros desconocidos o duplicados, espera en solo ida e ida y vuelta nocturna (sin tarifa definida). Los viajes rurales tampoco tienen tarifa definida. La creación de viajes sigue devolviendo `fare_ars: null` y `payment_status: "not_implemented"`: no hay precio acordado persistido ni cronómetro de espera del servidor.
+La ruta funciona incluso sin el binding DB y no consulta la base. Las demás rutas requieren el binding; `/api/health` comprueba su presencia, no la conectividad ni la aplicación del esquema D1. No requiere sesión, no crea viajes ni activa pagos. Rechaza parámetros desconocidos o duplicados, espera en solo ida e ida y vuelta nocturna (sin tarifa definida). Los viajes rurales tampoco tienen tarifa definida. La creación de viajes sigue devolviendo `fare_ars: null` y `payment_status: "not_implemented"`: no hay precio acordado persistido ni cronómetro de espera del servidor.
 
 Pruebas específicas: `node --test bm-viajes/tests/fare-api.test.mjs`. No se necesitan credenciales ni servicios externos.
 
