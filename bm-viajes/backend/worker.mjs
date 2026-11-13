@@ -220,7 +220,6 @@ async function getDriverPosition(env,user,id){
  return json({ok:true,position:p||null});
 }
 async function main(req,env){
- if(!env?.DB)throw new ApiError("Base de datos no configurada.",503);
  const url=new URL(req.url),path=url.pathname.replace(/\/$/,""),method=req.method;
  // Cotización pública de simulación: no crea viajes, no consulta datos personales ni habilita pagos.
  if(method==="GET"&&path==="/api/fare/estimate"){
@@ -231,6 +230,7 @@ async function main(req,env){
    try{return json({ok:true,estimate:estimateUrbanFare({kind,night:night==="true",waitSeconds:Number(wait)})});}
    catch(e){if(e instanceof RangeError)throw new ApiError("Modalidad o espera no admitida.",400);throw e;}
  }
+ if(!env?.DB)throw new ApiError("Base de datos no configurada.",503);
  if(method==="GET"&&path==="/api/health")return json({ok:true,service:"BM Viajes",mode:env.ENABLE_LIVE_RIDES==="true"?"pilot":"demo"});
  if(method==="GET"&&path==="/api/config")return json({ok:true,live_rides_enabled:env.ENABLE_LIVE_RIDES==="true",payments_enabled:false,area:"Ayacucho",fare_calculation:"pending_municipal_tariffs"});
  // La revocación debe seguir disponible incluso con el límite general de POST agotado.
