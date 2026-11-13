@@ -298,3 +298,28 @@ test('cash requires both participants, posts exactly one immutable commission an
   await assert.rejects(DB.prepare('DELETE FROM cash_confirmations WHERE ride_id=?').bind(id).run());
   assert.equal((await api('GET','/config')).payments_enabled,false);
 });
+
+test('payment selection and verified settlement credits cannot double count', async t => {
+  t.mock.method(Date,'now',()=>Date.parse('2026-11-13T15:00:00Z'));
+  const f=fixture(t), {api,DB}=f, {rider,driver}=await f.participants();
+  await api('POST','/rides',rider.token,{...route,payment_method:'mercadopago'},503);
+  await api('POST','/rides',rider.token,{...route,payment_method:'invalid'},400);
+  const ride=await api('POST','/rides',rider.token,{...route,payment_method:'cash'},201);
+  const id=ride.ride_id;
+  assert.equal(ride.payment_method,'cash');
+  await assert.rejects(DB.prepare("UPDATE ride_payment_methods SET method='mercadopago' WHERE ride_id=?").bind(id).run());
+  await api('POST',`/rides/${id}/accept`,driver.token);
+  await api('POST',`/rides/${id}/status`,driver.token,{status:'in_progress'});
+  await api('POST',`/rides/${id}/status`,driver.token,{status:'completed'});
+  await api('POST',`/rides/${id}/cash`,rider.token,{confirm:true});
+  await api('POST',`/rides/${id}/cash`,driver.token,{confirm:true});
+  const credit=(id,ref,amount)=>DB.prepare('INSERT INTO commission_settlements(id,driver_id,provider_reference,amount_ars,verified_at) VALUES(?,?,?,?,?)').bind(id,driver.user.id,ref,amount,Date.now()).run();
+  await credit('credit-1','test:1',250);
+  assert.equal((await api('GET','/driver/ledger',driver.token)).commission_due_ars,150);
+  await assert.rejects(credit('credit-2','test:1',100));
+  await assert.rejects(credit('credit-3','test:3',151));
+  await assert.rejects(DB.prepare("UPDATE commission_settlements SET amount_ars=1 WHERE id='credit-1'").run());
+  await credit('credit-4','test:4',150);
+  assert.equal((await api('GET','/driver/ledger',driver.token)).commission_due_ars,0);
+  assert.equal((await api('GET','/driver/ledger',rider.token)).settlements.length,0);
+});
