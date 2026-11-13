@@ -29,6 +29,7 @@
   }
   function setUser(next){
     sessionEpoch++;
+    clearDriverLocation();
     requestPending=false;acceptPending=new Set();
     user=next;
     $("login-section").hidden=!!next;$("user-area").hidden=!next;
@@ -94,6 +95,25 @@
       if(epoch===sessionEpoch&&generation===pickupGeneration&&user)alertText("No se obtuvo permiso de GPS. Podés señalar el lugar en el mapa.",true);
     },{enableHighAccuracy:true,timeout:15000,maximumAge:10000});
   });
+  // Driver coordinates are transient: never persist them or leave a stale marker visible.
+  let driverMarker=null,driverMarkerTimer=null,driverMarkerRide=null,driverLocationGeneration=0;
+  function clearDriverLocation(){
+    driverLocationGeneration++;
+    if(driverMarkerTimer!==null)clearTimeout(driverMarkerTimer);
+    driverMarkerTimer=null;
+    if(driverMarker&&map)map.removeLayer(driverMarker);
+    driverMarker=null;driverMarkerRide=null;
+  }
+  function displayDriverLocation(rideId,position){
+    clearDriverLocation();
+    if(!map||!window.L||!position||typeof position.lat!=="number"||typeof position.lng!=="number"||
+       !Number.isFinite(position.lat)||!Number.isFinite(position.lng)||Math.abs(position.lat)>90||Math.abs(position.lng)>180)return false;
+    driverMarker=L.circleMarker([position.lat,position.lng],{radius:9,color:"#153043",fillColor:"#f6bd56",fillOpacity:1,weight:3}).addTo(map).bindTooltip("Última posición del conductor");
+    driverMarkerRide=rideId;
+    map.setView([position.lat,position.lng],16);
+    driverMarkerTimer=setTimeout(clearDriverLocation,15000);
+    return true;
+  }
   function rideCard(ride,asDriver){
     const card=document.createElement("div");card.className="trip";
     const strong=document.createElement("strong");strong.textContent="Viaje "+ride.id.slice(0,8)+" · "+ride.status;
@@ -116,7 +136,7 @@
       if(ride.status!=="in_progress")action("Cancelar pedido",{status:"cancelled"},"status");
       if(["accepted","in_progress"].includes(ride.status)){
         const view=document.createElement("button");view.className="btn secondary";view.textContent="Consultar GPS del conductor";
-        view.addEventListener("click",async()=>{const epoch=sessionEpoch,viewerId=user?.id;try{const d=await api("/api/rides/"+ride.id+"/location");if(epoch!==sessionEpoch||!user||user.id!==viewerId)return;if(d.position&&map){map.setView([d.position.lat,d.position.lng],16);alertText("Posición reciente del conductor (con su autorización).");}else alertText("El conductor aún no compartió una posición reciente.");}catch(e){if(epoch===sessionEpoch&&user?.id===viewerId)alertText(e.message,true);}});
+        view.addEventListener("click",async()=>{clearDriverLocation();const epoch=sessionEpoch,viewerId=user?.id,generation=driverLocationGeneration;const current=()=>epoch===sessionEpoch&&user?.id===viewerId&&generation===driverLocationGeneration&&tab==="passenger";try{const d=await api("/api/rides/"+ride.id+"/location");if(!current())return;if(!myRides.some(x=>x.id===ride.id&&["accepted","in_progress"].includes(x.status)))return;if(displayDriverLocation(ride.id,d.position))alertText("Última posición compartida por el conductor. Se oculta automáticamente en 15 segundos.");else alertText("El conductor aún no compartió una posición reciente.");}catch(e){if(current())alertText(e.message,true);}});
         card.append(view);
       }
     }
@@ -135,6 +155,7 @@
     const r=await api("/api/rides/mine");
     if(epoch!==sessionEpoch||generation!==refreshGeneration||!user)return; // No restaurar viajes de una sesión cerrada.
     myRides=r.rides||[];
+    if(driverMarkerRide&&!myRides.some(x=>x.id===driverMarkerRide&&["accepted","in_progress"].includes(x.status)))clearDriverLocation();
     show("my-rides",myRides.filter(x=>x.rider_id===user.id || !x.rider_id&&x.driver_id!==user.id).map(x=>rideCard(x,false)),"Todavía no tenés viajes.");
     show("driver-current",myRides.filter(x=>x.driver_id===user.id).map(x=>rideCard(x,true)),"Todavía no hay viajes asignados.");
     if(user.driver_status==="approved"&&live){
@@ -170,6 +191,7 @@
     finally{if(epoch===sessionEpoch&&user)button.disabled=user.driver_status==="approved"||user.driver_status==="pending";}
   });
   function switchTab(next){
+    clearDriverLocation();
     tab=next;const pax=next==="passenger";
     $("passenger-panel").hidden=!pax;$("driver-panel").hidden=pax;
     $("tab-passenger").setAttribute("aria-pressed",String(pax));$("tab-driver").setAttribute("aria-pressed",String(!pax));
