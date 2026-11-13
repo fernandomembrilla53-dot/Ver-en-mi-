@@ -30,7 +30,7 @@
   function setUser(next){
     sessionEpoch++;
     stopGpsShare();
-    clearDriverLocation();
+    stopPassengerTracking();
     requestPending=false;acceptPending=new Set();
     user=next;
     $("login-section").hidden=!!next;$("user-area").hidden=!next;
@@ -119,6 +119,41 @@
     driverMarkerTimer=setTimeout(clearDriverLocation,remaining);
     return true;
   }
+  // Foreground-only passenger polling; one request at a time, never resume automatically.
+  function createLocationPoll({eligible,read,render,clear,schedule,cancel,onError}){
+  let active=null;
+  function stop(){const old=active;active=null;if(old&&old.timer!==null)cancel(old.timer);clear();}
+  function start(id){
+    stop();if(!eligible(id))return false;
+    const run={id,timer:null};active=run;
+    const current=()=>active===run&&eligible(id);
+    async function tick(){
+      if(!current()){if(active===run)stop();return;}
+      try{const data=await read(id);if(!current()){if(active===run)stop();return;}render(id,data.position);}
+      catch(e){if(active===run){stop();onError(e);}return;}
+      if(current())run.timer=schedule(tick,8000);
+    }
+    void tick();return true;
+  }
+  return {start,stop,activeId:()=>active?.id||null};
+}
+  const passengerTracking=createLocationPoll({
+    eligible:id=>!!user&&live&&tab==="passenger"&&!document.hidden&&myRides.some(x=>x.id===id&&x.rider_id===user.id&&["accepted","in_progress"].includes(x.status)),
+    read:id=>api("/api/rides/"+id+"/location"),
+    render:(id,position)=>{displayDriverLocation(id,position);},
+    clear:clearDriverLocation,
+    schedule:(fn,ms)=>setTimeout(fn,ms),
+    cancel:id=>clearTimeout(id),
+    onError:e=>{syncPassengerTrackingButtons();alertText("Seguimiento detenido: "+e.message,true);}
+  });
+  function syncPassengerTrackingButtons(){
+    document.querySelectorAll("[data-passenger-track]").forEach(b=>{
+      const active=passengerTracking.activeId()===b.dataset.passengerTrack;
+      b.textContent=active?"Detener seguimiento del conductor":"Seguir ubicación del conductor";
+      b.setAttribute("aria-pressed",String(active));
+    });
+  }
+  function stopPassengerTracking(){passengerTracking.stop();syncPassengerTrackingButtons();}
   // Explicit foreground-only GPS consent; never resume automatically.
   let gpsShare=null;
   function canShareGps(rideId){
@@ -161,8 +196,8 @@
       syncGpsButtons();
     }catch(e){stopGpsShare();alertText("No se pudo iniciar el GPS.",true);}
   }
-  document.addEventListener("visibilitychange",()=>{if(document.hidden)stopGpsShare();});
-  window.addEventListener("pagehide",stopGpsShare);
+  document.addEventListener("visibilitychange",()=>{if(document.hidden){stopGpsShare();stopPassengerTracking();}});
+  window.addEventListener("pagehide",()=>{stopGpsShare();stopPassengerTracking();});
   function rideCard(ride,asDriver){
     const card=document.createElement("div");card.className="trip";
     const strong=document.createElement("strong");strong.textContent="Viaje "+ride.id.slice(0,8)+" · "+ride.status;
@@ -187,8 +222,11 @@
     }else if(["requested","accepted","in_progress"].includes(ride.status)){
       if(ride.status!=="in_progress")action("Cancelar pedido",{status:"cancelled"},"status");
       if(["accepted","in_progress"].includes(ride.status)){
-        const view=document.createElement("button");view.className="btn secondary";view.textContent="Consultar GPS del conductor";
-        view.addEventListener("click",async()=>{clearDriverLocation();const epoch=sessionEpoch,viewerId=user?.id,generation=driverLocationGeneration;const current=()=>epoch===sessionEpoch&&user?.id===viewerId&&generation===driverLocationGeneration&&tab==="passenger";try{const d=await api("/api/rides/"+ride.id+"/location");if(!current())return;if(!myRides.some(x=>x.id===ride.id&&["accepted","in_progress"].includes(x.status)))return;if(displayDriverLocation(ride.id,d.position))alertText("Última posición reciente compartida por el conductor. Se oculta al vencer su vigencia.");else alertText("El conductor aún no compartió una posición reciente.");}catch(e){if(current())alertText(e.message,true);}});
+        const view=document.createElement("button");view.type="button";view.className="btn secondary";view.dataset.passengerTrack=ride.id;
+        view.addEventListener("click",()=>{
+          if(passengerTracking.activeId()===ride.id){stopPassengerTracking();alertText("Seguimiento detenido.");}
+          else if(passengerTracking.start(ride.id)){syncPassengerTrackingButtons();alertText("Seguimiento activo mientras esta pantalla esté abierta. Solo se muestran posiciones recientes compartidas por el conductor.");}
+        });
         card.append(view);
       }
     }
@@ -208,10 +246,12 @@
     if(epoch!==sessionEpoch||generation!==refreshGeneration||!user)return; // No restaurar viajes de una sesión cerrada.
     myRides=r.rides||[];
     if(gpsShare&&!canShareGps(gpsShare.rideId))stopGpsShare();
+    if(passengerTracking.activeId()&&!myRides.some(x=>x.id===passengerTracking.activeId()&&x.rider_id===user.id&&["accepted","in_progress"].includes(x.status)))stopPassengerTracking();
     if(driverMarkerRide&&!myRides.some(x=>x.id===driverMarkerRide&&["accepted","in_progress"].includes(x.status)))clearDriverLocation();
     show("my-rides",myRides.filter(x=>x.rider_id===user.id || !x.rider_id&&x.driver_id!==user.id).map(x=>rideCard(x,false)),"Todavía no tenés viajes.");
     show("driver-current",myRides.filter(x=>x.driver_id===user.id).map(x=>rideCard(x,true)),"Todavía no hay viajes asignados.");
     syncGpsButtons();
+    syncPassengerTrackingButtons();
     if(user.driver_status==="approved"&&live){
       const open=await api("/api/rides/open");
       if(epoch!==sessionEpoch||generation!==refreshGeneration||!user)return;
@@ -246,7 +286,7 @@
   });
   function switchTab(next){
     stopGpsShare();
-    clearDriverLocation();
+    stopPassengerTracking();
     tab=next;const pax=next==="passenger";
     $("passenger-panel").hidden=!pax;$("driver-panel").hidden=pax;
     $("tab-passenger").setAttribute("aria-pressed",String(pax));$("tab-driver").setAttribute("aria-pressed",String(!pax));
