@@ -27,7 +27,54 @@
       return data;
     }finally{clearTimeout(timeout);}
   }
+
+  // Independent simulation; no fare is attached to a ride until server snapshots exist.
+  function fareQuery(kind,night,minutes){
+    if(!["one_way","round_trip"].includes(kind)||typeof night!=="boolean"||
+      !Number.isInteger(minutes)||minutes<0||minutes>1440||
+      (kind==="one_way"&&minutes!==0)||(kind==="round_trip"&&night))throw Error("Modalidad o espera no admitida.");
+    return "/api/fare/estimate?kind="+kind+"&night="+night+"&waitSeconds="+minutes*60;
+  }
+  function installFarePreview(){
+    const host=document.createElement("div");host.className="panel";
+    const heading=document.createElement("h3");heading.textContent="Simulador de tarifa urbana";
+    const note=document.createElement("p");note.className="muted";note.textContent="Propuesta no oficial. No reserva un viaje ni fija su precio. La espera es estimada.";
+    const label=document.createElement("label");label.htmlFor="fare-kind";label.textContent="Modalidad";
+    const select=document.createElement("select");select.id="fare-kind";select.style.cssText="width:100%;min-height:44px;font:inherit";
+    for(const [value,name] of [["one_way","Solo ida"],["round_trip","Ida y vuelta"],["night","Solo ida nocturna"]]){
+      const option=document.createElement("option");option.value=value;option.textContent=name;select.append(option);
+    }
+    const waitLabel=document.createElement("label");waitLabel.htmlFor="fare-wait";waitLabel.textContent="Espera estimada (minutos)";
+    const wait=document.createElement("input");wait.id="fare-wait";wait.type="number";wait.min="0";wait.max="1440";wait.step="1";wait.value="0";wait.disabled=true;
+    const button=document.createElement("button");button.type="button";button.className="btn secondary";button.textContent="Consultar estimación";button.style.marginTop="10px";
+    const output=document.createElement("p");output.className="status";output.setAttribute("role","status");
+    let generation=0;
+    function reset(){generation++;wait.disabled=select.value!=="round_trip";if(wait.disabled)wait.value="0";output.textContent="Consultá el precio estimado.";button.disabled=false;}
+    select.addEventListener("change",reset);wait.addEventListener("input",reset);
+    button.addEventListener("click",async()=>{
+      const epoch=sessionEpoch,request=++generation;
+      const current=()=>epoch===sessionEpoch&&request===generation&&!!user;
+      button.disabled=true;output.textContent="Consultando servidor...";
+      try{
+        const kind=select.value==="round_trip"?"round_trip":"one_way";
+        if(!wait.disabled&&(!wait.value.trim()||!wait.checkValidity()))throw Error("Ingresá minutos enteros entre 0 y 1440.");
+        const data=await api(fareQuery(kind,select.value==="night",Number(wait.value)));
+        if(!current())return;
+        const e=data.estimate;
+        if(e?.simulationOnly!==true||e.currency!=="ARS"||!Number.isSafeInteger(e.total)||e.total<0)throw Error("Estimación inválida.");
+        const money=new Intl.NumberFormat("es-AR",{style:"currency",currency:"ARS",maximumFractionDigits:0});
+        output.textContent="Estimación: "+money.format(e.total)+". No incluye cobro ni reserva.";
+      }catch(e){if(current())output.textContent="No se pudo cotizar: "+e.message;}
+      finally{if(current())button.disabled=false;}
+    });
+    host.append(heading,note,label,select,waitLabel,wait,button,output);
+    $("request-ride").before(host);reset();
+    return ()=>{select.value="one_way";reset();};
+  }
+  const resetFarePreview=installFarePreview();
+
   function setUser(next){
+    resetFarePreview();
     sessionEpoch++;
     stopGpsShare();
     stopPassengerTracking();
