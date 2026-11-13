@@ -119,9 +119,15 @@ async function verifyAuth(req,env){
 async function applyDriver(req,env,user){
  const body=await jsonInput(req);
  if(body?.accept_review!==true)throw new ApiError("Confirmá que la cuenta requiere revisión manual.",400);
- if(user.driver_status==="approved")return json({ok:true,status:"approved"});
- if(user.driver_status==="suspended")throw new ApiError("Cuenta suspendida. Contactá a soporte.",403);
- await env.DB.prepare("UPDATE users SET driver_status='pending' WHERE id=? AND driver_status IN ('none','rejected','pending')").bind(user.id).run();
+ // Consultar el estado actual, no el snapshot de autenticación: una suspensión
+ // o aprobación concurrente no debe producir una confirmación falsa de solicitud.
+ const changed=await env.DB.prepare("UPDATE users SET driver_status='pending' WHERE id=? AND driver_status IN ('none','rejected','pending') RETURNING driver_status").bind(user.id).first();
+ if(!changed){
+   const current=await env.DB.prepare("SELECT driver_status FROM users WHERE id=?").bind(user.id).first();
+   if(current?.driver_status==="approved")return json({ok:true,status:"approved"});
+   if(current?.driver_status==="suspended")throw new ApiError("Cuenta suspendida. Contactá a soporte.",403);
+   throw new ApiError("El estado de la cuenta cambió. Volvé a intentar.",409);
+ }
  return json({ok:true,status:"pending",message:"Solicitud registrada. Antes de conducir debe verificarse identidad, licencia, vehículo, seguro y habilitación local. No subas documentos por esta API."});
 }
 function driverOnly(user){if(user.driver_status!=="approved")throw new ApiError("Solo conductores verificados pueden recibir viajes.",403);}
