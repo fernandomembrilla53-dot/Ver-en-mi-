@@ -202,6 +202,10 @@ test('scheduled cleanup expires a pending request without waiting in real time',
   const { ride_id: id } = await api('POST', '/rides', rider.token, route, 201);
   await DB.prepare('UPDATE rides SET expires_at=? WHERE id=?').bind(Date.now() - 1000, id).run();
   assert.equal((await api('GET', '/rides/open', driver.token)).rides.length, 0);
+  // Both reads must agree before the scheduled cleanup actually runs.
+  assert.equal((await api('GET', `/rides/${id}`, rider.token)).ride.status, 'cancelled');
+  assert.equal((await api('GET', '/rides/mine', rider.token)).rides[0].status, 'cancelled');
+  assert.equal((await DB.prepare('SELECT status FROM rides WHERE id=?').bind(id).first()).status, 'requested');
   await api('POST', `/rides/${id}/accept`, driver.token, undefined, 409);
   const tasks = [];
   await worker.scheduled({}, env, { waitUntil(promise) { tasks.push(promise); } });
