@@ -108,10 +108,14 @@
     clearDriverLocation();
     if(!map||!window.L||!position||typeof position.lat!=="number"||typeof position.lng!=="number"||
        !Number.isFinite(position.lat)||!Number.isFinite(position.lng)||Math.abs(position.lat)>90||Math.abs(position.lng)>180)return false;
+    // The server may return a position up to two minutes old. Never extend its freshness on repeated reads.
+    const age=Date.now()-position.updated_at;
+    if(typeof position.updated_at!=="number"||!Number.isFinite(age)||age< -5000||age>=15000)return false;
+    const remaining=Math.min(15000,15000-Math.max(0,age));
     driverMarker=L.circleMarker([position.lat,position.lng],{radius:9,color:"#153043",fillColor:"#f6bd56",fillOpacity:1,weight:3}).addTo(map).bindTooltip("Última posición del conductor");
     driverMarkerRide=rideId;
     map.setView([position.lat,position.lng],16);
-    driverMarkerTimer=setTimeout(clearDriverLocation,15000);
+    driverMarkerTimer=setTimeout(clearDriverLocation,remaining);
     return true;
   }
   function rideCard(ride,asDriver){
@@ -136,7 +140,7 @@
       if(ride.status!=="in_progress")action("Cancelar pedido",{status:"cancelled"},"status");
       if(["accepted","in_progress"].includes(ride.status)){
         const view=document.createElement("button");view.className="btn secondary";view.textContent="Consultar GPS del conductor";
-        view.addEventListener("click",async()=>{clearDriverLocation();const epoch=sessionEpoch,viewerId=user?.id,generation=driverLocationGeneration;const current=()=>epoch===sessionEpoch&&user?.id===viewerId&&generation===driverLocationGeneration&&tab==="passenger";try{const d=await api("/api/rides/"+ride.id+"/location");if(!current())return;if(!myRides.some(x=>x.id===ride.id&&["accepted","in_progress"].includes(x.status)))return;if(displayDriverLocation(ride.id,d.position))alertText("Última posición compartida por el conductor. Se oculta automáticamente en 15 segundos.");else alertText("El conductor aún no compartió una posición reciente.");}catch(e){if(current())alertText(e.message,true);}});
+        view.addEventListener("click",async()=>{clearDriverLocation();const epoch=sessionEpoch,viewerId=user?.id,generation=driverLocationGeneration;const current=()=>epoch===sessionEpoch&&user?.id===viewerId&&generation===driverLocationGeneration&&tab==="passenger";try{const d=await api("/api/rides/"+ride.id+"/location");if(!current())return;if(!myRides.some(x=>x.id===ride.id&&["accepted","in_progress"].includes(x.status)))return;if(displayDriverLocation(ride.id,d.position))alertText("Última posición reciente compartida por el conductor. Se oculta al vencer su vigencia.");else alertText("El conductor aún no compartió una posición reciente.");}catch(e){if(current())alertText(e.message,true);}});
         card.append(view);
       }
     }
