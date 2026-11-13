@@ -8,7 +8,7 @@ La aplicación pública está en `../index.html` y funciona como **demo**. La AP
 - Mapa interactivo de OpenStreetMap (requiere Internet) y GPS voluntario del usuario. Elegir puntos no constituye una reserva.
 - Demo local de pasajeros, conductores, tipos de vehículo, comisión del 10%, favoritos y compartir.
 - API separada para solicitud/verificación de código de correo por Brevo, sesiones con tokens aleatorios, permisos de conductor con aprobación manual, creación/aceptación/estado de viajes, y posición reciente solo de conductor asignado.
-- Control CORS, limitación de intentos, exclusión de conductores no verificados, ubicación caducable, solicitud atómica de aceptación, sin credenciales públicas. **Todo el servidor falla cerrado** hasta que `ENABLE_LIVE_RIDES` sea exactamente `true`.
+- Control CORS, limitación de intentos, exclusión de conductores no verificados, ubicación caducable, solicitud atómica de aceptación, sin credenciales públicas. **Las operaciones de viajes y GPS fallan cerrado** hasta que `ENABLE_LIVE_RIDES` sea exactamente `true`. Autenticación, configuración, historial autorizado y cotizaciones simuladas tienen controles separados.
 
 ## Configuración segura para un piloto controlado
 
@@ -18,7 +18,15 @@ La aplicación pública está en `../index.html` y funciona como **demo**. La AP
 4. Configurar secretos privados (nunca en GitHub): `npx wrangler secret put AUTH_SECRET` (32+ caracteres aleatorios) y `npx wrangler secret put BREVO_API_KEY`.
 5. Desplegar la API: `npx wrangler deploy`. Validar `GET /api/health`, `GET /api/config`, CORS y la entrega real de OTP antes de probar con un usuario invitado.
 6. Antes de habilitar viajes, comprobar requisitos locales, seguros, documentación, consentimiento GPS y respuesta a emergencias. Aprobar a cada conductor verificándolo fuera de esta app; el estado por defecto siempre es `pending` o `none`.
-7. Solo para un piloto autorizado y después de superar pruebas de aceptación, cambiar `ENABLE_LIVE_RIDES` a `true`; la API todavía **no implementa cobros ni tarifa oficial**.
+7. Solo para un piloto autorizado y después de superar pruebas de aceptación, cambiar `ENABLE_LIVE_RIDES` a `true`; la API todavía **no implementa cobros ni tarifa oficial**. La cotización simulada no autoriza un traslado.
+
+## Tarifas de simulación (no comerciales)
+
+`GET /api/fare/estimate?kind=one_way` devuelve $4.000 ARS; `kind=round_trip` devuelve $6.000; `kind=one_way&night=true` devuelve $4.500. Para ida y vuelta, `waitSeconds=600` devuelve $7.250: cinco minutos gratuitos y $250 por minuto adicional iniciado. Comisión: 10%. La respuesta incluye `simulationOnly: true` y versión del tarifario.
+
+La ruta requiere que exista el binding DB, pero no consulta la base. No requiere sesión, no crea viajes ni activa pagos. Rechaza parámetros desconocidos o duplicados, espera en solo ida e ida y vuelta nocturna (sin tarifa definida). Los viajes rurales tampoco tienen tarifa definida. La creación de viajes sigue devolviendo `fare_ars: null` y `payment_status: "not_implemented"`: no hay precio acordado persistido ni cronómetro de espera del servidor.
+
+Pruebas específicas: `node --test bm-viajes/tests/fare-api.test.mjs`. No se necesitan credenciales ni servicios externos.
 
 ## Criterios de aceptación antes de operar con personas reales
 
@@ -39,7 +47,7 @@ node --test bm-viajes/tests/backend-journey.test.mjs
 
 No requiere `npm install`, Wrangler, Cloudflare, Brevo, claves, `.env` ni conexión a Internet. Cada caso crea una base SQLite **en memoria**, aplica `schema.sql` y la destruye al terminar. Las peticiones se entregan directamente a `worker.fetch` mediante objetos Request/Response; no se abre un puerto ni se usa una URL de producción. El correo se captura en un buzón ficticio y cualquier otra llamada a `fetch` hace fallar la prueba, aunque el backend capture su error.
 
-El recorrido usa cuentas `@example.invalid`: solicita y verifica OTP, registra la solicitud del conductor, simula su aprobación manual únicamente en la base temporal, crea y acepta el pedido, comparte tres posiciones, inicia/finaliza el viaje, verifica historial y borrado GPS, y revoca ambas sesiones. Se comprueba que tarifa y pago continúan sin implementar. No hay cobros simulados como exitosos.
+El recorrido usa cuentas `@example.invalid`: solicita y verifica OTP, registra la solicitud del conductor, simula su aprobación manual únicamente en la base temporal, crea y acepta el pedido, comparte tres posiciones, inicia/finaliza el viaje, verifica historial y borrado GPS, y revoca ambas sesiones. Se comprueba que el precio definitivo del viaje y el pago continúan sin implementar; la cotización independiente sí existe. No hay cobros simulados como exitosos.
 
 Para recorrer los estados, el objeto de configuración **local de la prueba** cambia `ENABLE_LIVE_RIDES` a `true`; no modifica ninguna configuración de despliegue. Otro caso comprueba que `false` bloquea creación, aceptación, cambios de estado y lectura/escritura GPS, incluso con un viaje ya aceptado.
 
@@ -52,7 +60,7 @@ node --test bm-viajes/tests/*.test.mjs
 python3 bm-viajes/backend/test_accept.py
 ```
 
-El workflow existente `.github/workflows/bm-viajes.yml` incluye automáticamente el archivo `*.test.mjs`. El adaptador ejecuta SQL real y transacciones SQLite, pero no reproduce la infraestructura distribuida de D1. Esta prueba valida el backend en proceso; no acredita entrega real de correos, dos teléfonos, GPS físico, mapas, tarifas, pagos ni despliegue en Cloudflare.
+El workflow existente `.github/workflows/bm-viajes.yml` incluye automáticamente el archivo `*.test.mjs`. El adaptador ejecuta SQL real y transacciones SQLite, pero no reproduce la infraestructura distribuida de D1. Esta prueba valida el backend en proceso; no acredita entrega real de correos, dos teléfonos, GPS físico, mapas, tarifas comerciales, pagos ni despliegue en Cloudflare.
 
 ## Estado de operación
 
