@@ -137,10 +137,10 @@ async function newRide(req,env,user){
  liveOnly(env);
  const input=await jsonInput(req),a=coords(input,"origin"),b=coords(input,"destination"),air=haversine(a,b);
  if(air<.1||air>30)throw new ApiError("Elegí un recorrido válido.",400);
- // La comprobación debe estar dentro del INSERT: dos solicitudes paralelas no pueden crear dos viajes.
+ // La comprobación atómica impide dos solicitudes paralelas y viajar como pasajero mientras se conduce.
  // Un viaje aceptado o en curso sigue activo aunque venza el plazo original de solicitud.
  const now=Date.now(),id=crypto.randomUUID();
- const inserted=await env.DB.prepare("INSERT INTO rides(id,rider_id,origin_lat,origin_lng,destination_lat,destination_lng,distance_air_km,status,created_at,updated_at,expires_at) SELECT ?,?,?,?,?,?,?,'requested',?,?,? WHERE NOT EXISTS (SELECT 1 FROM rides WHERE rider_id=? AND (status IN ('accepted','in_progress') OR (status='requested' AND expires_at>?)))").bind(id,user.id,a.lat,a.lng,b.lat,b.lng,Number(air.toFixed(2)),now,now,now+15*60000,user.id,now).run();
+ const inserted=await env.DB.prepare("INSERT INTO rides(id,rider_id,origin_lat,origin_lng,destination_lat,destination_lng,distance_air_km,status,created_at,updated_at,expires_at) SELECT ?,?,?,?,?,?,?,'requested',?,?,? WHERE NOT EXISTS (SELECT 1 FROM rides WHERE (rider_id=? AND (status IN ('accepted','in_progress') OR (status='requested' AND expires_at>?))) OR (driver_id=? AND status IN ('accepted','in_progress')))").bind(id,user.id,a.lat,a.lng,b.lat,b.lng,Number(air.toFixed(2)),now,now,now+15*60000,user.id,now,user.id).run();
  if(!inserted.meta?.changes)throw new ApiError("Ya tenés un viaje activo. Terminá o cancelá ese pedido.",409);
  return json({ok:true,ride_id:id,status:"requested",distance_air_km:Number(air.toFixed(2)),fare_ars:null,payment_status:"not_implemented",message:"Sin tarifa ni pago confirmado. Coordinación de prueba sujeta a habilitación."},201);
 }
@@ -172,8 +172,8 @@ async function acceptRide(env,user,id){
  const current=await env.DB.prepare("SELECT id FROM rides WHERE driver_id=? AND status IN ('accepted','in_progress') LIMIT 1").bind(user.id).first();
  if(current)throw new ApiError("Ya tenés un viaje en curso.",409);
  // Revalidar aprobación en la escritura: una suspensión concurrente impide aceptar.
- const result=await env.DB.prepare("UPDATE rides SET driver_id=?,status='accepted',updated_at=? WHERE id=? AND status='requested' AND expires_at>? AND driver_id IS NULL AND rider_id<>? AND NOT EXISTS (SELECT 1 FROM rides AS active WHERE active.driver_id=? AND active.status IN ('accepted','in_progress')) AND EXISTS (SELECT 1 FROM users WHERE id=? AND driver_status='approved')").bind(user.id,now,id,now,user.id,user.id,user.id).run();
- if(!result.meta?.changes)throw new ApiError("El pedido ya fue aceptado o venció.",409);
+ const result=await env.DB.prepare("UPDATE rides SET driver_id=?,status='accepted',updated_at=? WHERE id=? AND status='requested' AND expires_at>? AND driver_id IS NULL AND rider_id<>? AND NOT EXISTS (SELECT 1 FROM rides AS active WHERE (active.driver_id=? AND active.status IN ('accepted','in_progress')) OR (active.rider_id=? AND (active.status IN ('accepted','in_progress') OR (active.status='requested' AND active.expires_at>?)))) AND EXISTS (SELECT 1 FROM users WHERE id=? AND driver_status='approved')").bind(user.id,now,id,now,user.id,user.id,user.id,now,user.id).run();
+ if(!result.meta?.changes)throw new ApiError("El pedido ya fue aceptado, venció o tenés otro viaje activo.",409);
  return json({ok:true,status:"accepted"});
 }
 async function rideStatus(req,env,user,id){
