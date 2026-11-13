@@ -29,6 +29,7 @@
   }
   function setUser(next){
     sessionEpoch++;
+    stopGpsShare();
     clearDriverLocation();
     requestPending=false;acceptPending=new Set();
     user=next;
@@ -118,6 +119,50 @@
     driverMarkerTimer=setTimeout(clearDriverLocation,remaining);
     return true;
   }
+  // Explicit foreground-only GPS consent; never resume automatically.
+  let gpsShare=null;
+  function canShareGps(rideId){
+    return !!user&&live&&user.driver_status==="approved"&&tab==="driver"&&!document.hidden&&
+      myRides.some(x=>x.id===rideId&&x.driver_id===user.id&&x.status==="in_progress");
+  }
+  function stopGpsShare(){
+    const share=gpsShare;gpsShare=null;
+    if(share&&share.watch!==null)navigator.geolocation.clearWatch(share.watch);
+    syncGpsButtons();
+  }
+  function syncGpsButtons(){
+    document.querySelectorAll("[data-gps-share]").forEach(b=>{
+      const active=gpsShare?.rideId===b.dataset.gpsShare;
+      b.textContent=active?"Detener GPS compartido":"Compartir GPS mientras esta pantalla esté abierta";
+      b.setAttribute("aria-pressed",String(active));
+    });
+  }
+  function startGpsShare(rideId){
+    if(!canShareGps(rideId)||!navigator.geolocation)return;
+    stopGpsShare();
+    const share={rideId,watch:null,lastSent:null,busy:false};
+    gpsShare=share;
+    const current=()=>gpsShare===share&&canShareGps(rideId);
+    try{
+      share.watch=navigator.geolocation.watchPosition(async p=>{
+        if(!current()){if(gpsShare===share)stopGpsShare();return;}
+        const now=Date.now(),c=p.coords;
+        if(share.busy||(share.lastSent!==null&&now-share.lastSent<6000)||
+          !Number.isFinite(p.timestamp)||now-p.timestamp>10000||p.timestamp>now+5000||
+          !Number.isFinite(c.latitude)||Math.abs(c.latitude)>90||
+          !Number.isFinite(c.longitude)||Math.abs(c.longitude)>180||
+          !Number.isFinite(c.accuracy)||c.accuracy<0)return;
+        share.busy=true;share.lastSent=now;
+        try{await api("/api/rides/"+rideId+"/location","POST",{position:{lat:c.latitude,lng:c.longitude},accuracy_m:c.accuracy});}
+        catch(e){if(current()){stopGpsShare();alertText("GPS detenido: "+e.message,true);}}
+        finally{share.busy=false;}
+      },()=>{if(gpsShare===share){stopGpsShare();alertText("GPS detenido: permiso o ubicación no disponible.",true);}},
+      {enableHighAccuracy:true,timeout:12000,maximumAge:0});
+      syncGpsButtons();
+    }catch(e){stopGpsShare();alertText("No se pudo iniciar el GPS.",true);}
+  }
+  document.addEventListener("visibilitychange",()=>{if(document.hidden)stopGpsShare();});
+  window.addEventListener("pagehide",stopGpsShare);
   function rideCard(ride,asDriver){
     const card=document.createElement("div");card.className="trip";
     const strong=document.createElement("strong");strong.textContent="Viaje "+ride.id.slice(0,8)+" · "+ride.status;
@@ -125,7 +170,7 @@
     card.append(strong,detail);
     function action(label,next,method){
       const b=document.createElement("button");b.type="button";b.className="btn secondary";b.textContent=label;
-      b.addEventListener("click",async()=>{if(!user||b.disabled)return;const epoch=sessionEpoch;const current=()=>epoch===sessionEpoch&&!!user;b.disabled=true;try{await api("/api/rides/"+ride.id+"/"+method,"POST",next);if(!current())return;await refresh();if(current())alertText("Estado actualizado.");}catch(e){if(current())alertText(e.message,true);}finally{b.disabled=false;}});
+      b.addEventListener("click",async()=>{if(!user||b.disabled)return;const epoch=sessionEpoch;const current=()=>epoch===sessionEpoch&&!!user;b.disabled=true;if(asDriver&&next.status==="completed")stopGpsShare();try{await api("/api/rides/"+ride.id+"/"+method,"POST",next);if(!current())return;await refresh();if(current())alertText("Estado actualizado.");}catch(e){if(current())alertText(e.message,true);}finally{b.disabled=false;}});
       card.append(b);
     }
     if(asDriver){
@@ -133,8 +178,11 @@
       if(ride.status==="in_progress"){
         action("Finalizar trayecto",{status:"completed"},"status");
         const gps=document.createElement("button");gps.className="btn secondary";gps.textContent="Enviar posición GPS ahora";
-        gps.addEventListener("click",()=>{if(!navigator.geolocation){alertText("GPS no disponible.",true);return;}const epoch=sessionEpoch,driverId=user?.id;navigator.geolocation.getCurrentPosition(async p=>{if(epoch!==sessionEpoch||!user||user.id!==driverId)return;try{await api("/api/rides/"+ride.id+"/location","POST",{position:{lat:p.coords.latitude,lng:p.coords.longitude},accuracy_m:p.coords.accuracy});if(epoch===sessionEpoch&&user?.id===driverId)alertText("Posición enviada voluntariamente al pasajero asignado.");}catch(e){if(epoch===sessionEpoch&&user?.id===driverId)alertText(e.message,true);}},()=>{if(epoch===sessionEpoch&&user?.id===driverId)alertText("Sin permiso GPS.",true);},{enableHighAccuracy:true,timeout:12000});});
+        gps.addEventListener("click",()=>{if(!navigator.geolocation){alertText("GPS no disponible.",true);return;}const epoch=sessionEpoch,driverId=user?.id;navigator.geolocation.getCurrentPosition(async p=>{if(epoch!==sessionEpoch||!user||user.id!==driverId||!canShareGps(ride.id))return;try{await api("/api/rides/"+ride.id+"/location","POST",{position:{lat:p.coords.latitude,lng:p.coords.longitude},accuracy_m:p.coords.accuracy});if(epoch===sessionEpoch&&user?.id===driverId)alertText("Posición enviada voluntariamente al pasajero asignado.");}catch(e){if(epoch===sessionEpoch&&user?.id===driverId)alertText(e.message,true);}},()=>{if(epoch===sessionEpoch&&user?.id===driverId)alertText("Sin permiso GPS.",true);},{enableHighAccuracy:true,timeout:12000});});
         card.append(gps);
+        const shareButton=document.createElement("button");shareButton.type="button";shareButton.className="btn secondary";shareButton.dataset.gpsShare=ride.id;
+        shareButton.addEventListener("click",()=>{if(gpsShare?.rideId===ride.id){stopGpsShare();alertText("GPS compartido detenido. La última posición enviada puede seguir visible brevemente.");}else{startGpsShare(ride.id);if(gpsShare)alertText("GPS compartido con el pasajero asignado mientras esta pantalla esté abierta.");}});
+        card.append(shareButton);
       }
     }else if(["requested","accepted","in_progress"].includes(ride.status)){
       if(ride.status!=="in_progress")action("Cancelar pedido",{status:"cancelled"},"status");
@@ -159,9 +207,11 @@
     const r=await api("/api/rides/mine");
     if(epoch!==sessionEpoch||generation!==refreshGeneration||!user)return; // No restaurar viajes de una sesión cerrada.
     myRides=r.rides||[];
+    if(gpsShare&&!canShareGps(gpsShare.rideId))stopGpsShare();
     if(driverMarkerRide&&!myRides.some(x=>x.id===driverMarkerRide&&["accepted","in_progress"].includes(x.status)))clearDriverLocation();
     show("my-rides",myRides.filter(x=>x.rider_id===user.id || !x.rider_id&&x.driver_id!==user.id).map(x=>rideCard(x,false)),"Todavía no tenés viajes.");
     show("driver-current",myRides.filter(x=>x.driver_id===user.id).map(x=>rideCard(x,true)),"Todavía no hay viajes asignados.");
+    syncGpsButtons();
     if(user.driver_status==="approved"&&live){
       const open=await api("/api/rides/open");
       if(epoch!==sessionEpoch||generation!==refreshGeneration||!user)return;
@@ -195,6 +245,7 @@
     finally{if(epoch===sessionEpoch&&user)button.disabled=user.driver_status==="approved"||user.driver_status==="pending";}
   });
   function switchTab(next){
+    stopGpsShare();
     clearDriverLocation();
     tab=next;const pax=next==="passenger";
     $("passenger-panel").hidden=!pax;$("driver-panel").hidden=pax;
