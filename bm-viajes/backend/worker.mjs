@@ -172,7 +172,8 @@ async function rideStatus(req,env,user,id){
  else if(next==="in_progress" && ride.driver_id===user.id && ride.status==="accepted")old="accepted";
  else if(next==="completed" && ride.driver_id===user.id && ride.status==="in_progress")old="in_progress";
  else throw new ApiError("Transición no autorizada para este viaje.",409);
- const result=await env.DB.prepare("UPDATE rides SET status=?,updated_at=? WHERE id=? AND status=?").bind(next,now,id,old).run();
+ // Un conductor suspendido no puede iniciar un traslado; sí puede cancelar o cerrar uno en curso por seguridad.
+ const result=await env.DB.prepare("UPDATE rides SET status=?,updated_at=? WHERE id=? AND status=? AND (?<>'in_progress' OR EXISTS (SELECT 1 FROM users WHERE id=rides.driver_id AND driver_status='approved'))").bind(next,now,id,old,next).run();
  if(!result.meta?.changes)throw new ApiError("El viaje cambió de estado. Actualizá.",409);
  if(next==="completed"||next==="cancelled")await env.DB.prepare("DELETE FROM ride_positions WHERE ride_id=?").bind(id).run();
  return json({ok:true,status:next});
