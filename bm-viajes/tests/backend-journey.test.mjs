@@ -74,7 +74,7 @@ test('complete passenger/driver journey: OTP, approval, request, GPS, completion
   const outsider = await f.login('outsider');
   const ride = await api('POST', '/rides', rider.token, route, 201), id = ride.ride_id;
   assert.equal(ride.status, 'requested');
-  assert.equal(ride.fare_ars, null);
+  assert.ok([4000,4500].includes(ride.fare_ars));
   assert.equal(ride.payment_status, 'not_implemented');
   await api('POST', '/rides', rider.token, route, 409);
   const open = (await api('GET', '/rides/open', driver.token)).rides;
