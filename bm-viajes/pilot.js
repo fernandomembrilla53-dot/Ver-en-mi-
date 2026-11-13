@@ -103,11 +103,11 @@
   function redraw(){
     if(!map||!window.L)return;
     for(const k of ["origin","destination"]){
-      if(markers[k])map.removeLayer(markers[k]);
+      if(markers[k]){map.removeLayer(markers[k]);delete markers[k];}
       const p=coords[k];
       if(p)markers[k]=L.marker([p.lat,p.lng]).addTo(map).bindPopup(k==="origin"?"Inicio A":"Destino B");
     }
-    if(line)map.removeLayer(line);
+    if(line){map.removeLayer(line);line=null;}
     if(coords.origin&&coords.destination){
       line=L.polyline([[coords.origin.lat,coords.origin.lng],[coords.destination.lat,coords.destination.lng]],{color:"#f0a832",weight:5,dashArray:"8 8"}).addTo(map);
       $("pickup-status").textContent="A: "+latText(coords.origin)+" · B: "+latText(coords.destination)+". Distancia aérea: "+distKm(coords.origin,coords.destination)+" km, no ruta de calles.";
@@ -118,7 +118,8 @@
   }
   function setPoint(key,p){
     const x=pos(p);if(!Number.isFinite(x.lat)||!Number.isFinite(x.lng)||Math.abs(x.lat)>90||Math.abs(x.lng)>180)return;
-    coords[key]=x;pick=null;redraw();
+    // A manual map selection must invalidate any pending GPS callback.
+    pickupGeneration++;coords[key]=x;pick=null;redraw();
   }
   function initMap(){
     if(!window.L){alertText("El mapa no pudo cargarse; necesitás Internet para elegir puntos.",true);return;}
@@ -135,6 +136,7 @@
     if(!user){alertText("Iniciá sesión antes de utilizar el GPS del piloto.",true);return;}
     if(!navigator.geolocation){alertText("GPS no disponible.",true);return;}
     const epoch=sessionEpoch,generation=++pickupGeneration;
+    pick=null;redraw();
     navigator.geolocation.getCurrentPosition(p=>{
       if(epoch!==sessionEpoch||generation!==pickupGeneration||!user)return; // Ignorar GPS pendiente tras cerrar sesión o cambiar de usuario.
       setPoint("origin",{lat:p.coords.latitude,lng:p.coords.longitude});map?.setView([p.coords.latitude,p.coords.longitude],16);
