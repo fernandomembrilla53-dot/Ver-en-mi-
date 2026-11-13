@@ -29,6 +29,31 @@ La aplicación pública está en `../index.html` y funciona como **demo**. La AP
 - Política de privacidad con retención, protección de datos y mecanismos de acceso/eliminación; registro de incidentes, accesibilidad, pruebas de carga, auditoría de seguridad y soporte.
 - Para pagos reales: integrar Mercado Pago desde servidor, verificar firma de webhooks, idempotencia y conciliación. Jamás exponer el access token en el navegador ni simular un cobro como exitoso.
 
-## Estado actual
+## Prueba integral local, sin servicios externos
+
+Desde la raíz del repositorio, con **Node.js 22.13 o superior** (incluye `node:sqlite`):
+
+```sh
+node --test bm-viajes/tests/backend-journey.test.mjs
+```
+
+No requiere `npm install`, Wrangler, Cloudflare, Brevo, claves, `.env` ni conexión a Internet. Cada caso crea una base SQLite **en memoria**, aplica `schema.sql` y la destruye al terminar. Las peticiones se entregan directamente a `worker.fetch` mediante objetos Request/Response; no se abre un puerto ni se usa una URL de producción. El correo se captura en un buzón ficticio y cualquier otra llamada a `fetch` hace fallar la prueba, aunque el backend capture su error.
+
+El recorrido usa cuentas `@example.invalid`: solicita y verifica OTP, registra la solicitud del conductor, simula su aprobación manual únicamente en la base temporal, crea y acepta el pedido, comparte tres posiciones, inicia/finaliza el viaje, verifica historial y borrado GPS, y revoca ambas sesiones. Se comprueba que tarifa y pago continúan sin implementar. No hay cobros simulados como exitosos.
+
+Para recorrer los estados, el objeto de configuración **local de la prueba** cambia `ENABLE_LIVE_RIDES` a `true`; no modifica ninguna configuración de despliegue. Otro caso comprueba que `false` bloquea creación, aceptación, cambios de estado y lectura/escritura GPS, incluso con un viaje ya aceptado.
+
+Los ocho casos también cubren: cuentas sin aprobar, OTP reutilizado, acceso ajeno, transición indebida, cancelación, GPS vencido o impreciso, suspensión, dos aceptaciones competidoras, vencimiento del pedido y rollback del cierre si falla el borrado GPS. No hay esperas temporizadas: el vencimiento se prepara en la base temporal. IDs y códigos son aleatorios como en producción; los resultados esperados no dependen de sus valores.
+
+La salida de Node identifica cada escenario y termina con código distinto de cero ante un fallo. Para ejecutar además las pruebas existentes:
+
+```sh
+node --test bm-viajes/tests/*.test.mjs
+python3 bm-viajes/backend/test_accept.py
+```
+
+El workflow existente `.github/workflows/bm-viajes.yml` incluye automáticamente el archivo `*.test.mjs`. El adaptador ejecuta SQL real y transacciones SQLite, pero no reproduce la infraestructura distribuida de D1. Esta prueba valida el backend en proceso; no acredita entrega real de correos, dos teléfonos, GPS físico, mapas, tarifas, pagos ni despliegue en Cloudflare.
+
+## Estado de operación
 
 El sitio es una **demo pública instalable**. La API y D1 son infraestructura de preparación, no un servicio ya activado. No usar como sistema de transporte hasta satisfacer todos los criterios.
