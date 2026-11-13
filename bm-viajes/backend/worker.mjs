@@ -141,13 +141,17 @@ async function newRide(req,env,user){
  // Un viaje aceptado o en curso sigue activo aunque venza el plazo original de solicitud.
  const now=Date.now(),id=crypto.randomUUID();
  const kind=input.kind??"one_way";
+ const paymentMethod=input.payment_method??"cash";
+ if(!["cash","mercadopago"].includes(paymentMethod))throw new ApiError("Método de pago inválido.",400);
+ if(paymentMethod==="mercadopago")throw new ApiError("Mercado Pago todavía no está habilitado.",503);
  const night=Number(new Intl.DateTimeFormat("en-GB",{timeZone:"America/Argentina/Buenos_Aires",hour:"2-digit",hourCycle:"h23"}).format(new Date(now)));
  let fare;try{fare=estimateUrbanFare({kind,night:night>=22||night<6});}catch(e){if(e instanceof RangeError)throw new ApiError("Modalidad sin tarifa definida.",400);throw e;}
  const insertRide=env.DB.prepare("INSERT INTO rides(id,rider_id,origin_lat,origin_lng,destination_lat,destination_lng,distance_air_km,status,created_at,updated_at,expires_at) SELECT ?,?,?,?,?,?,?,'requested',?,?,? WHERE NOT EXISTS (SELECT 1 FROM rides WHERE (rider_id=? AND (status IN ('accepted','in_progress') OR (status='requested' AND expires_at>?))) OR (driver_id=? AND status IN ('accepted','in_progress')))").bind(id,user.id,a.lat,a.lng,b.lat,b.lng,Number(air.toFixed(2)),now,now,now+15*60000,user.id,now,user.id);
  const insertFare=env.DB.prepare("INSERT INTO ride_fares(ride_id,kind,tariff_version,base_ars,commission_bps,wait_free_seconds,wait_minute_ars,created_at) SELECT id,?,?,?,?,?,?,? FROM rides WHERE id=?").bind(kind,fare.version,fare.base,TARIFF.commissionPercent*100,kind==="round_trip"?TARIFF.freeWaitSeconds:0,kind==="round_trip"?TARIFF.waitPerMinute:0,now,id);
- const [inserted]=await env.DB.batch([insertRide,insertFare]);
+ const insertMethod=env.DB.prepare("INSERT INTO ride_payment_methods(ride_id,method) SELECT id,? FROM rides WHERE id=?").bind(paymentMethod,id);
+ const [inserted]=await env.DB.batch([insertRide,insertFare,insertMethod]);
  if(!inserted.meta?.changes)throw new ApiError("Ya tenés un viaje activo. Terminá o cancelá ese pedido.",409);
- return json({ok:true,ride_id:id,status:"requested",distance_air_km:Number(air.toFixed(2)),fare_ars:fare.base,payment_status:"not_implemented",message:"Tarifa base de piloto guardada; sin pago confirmado."},201);
+ return json({ok:true,ride_id:id,status:"requested",distance_air_km:Number(air.toFixed(2)),fare_ars:fare.base,payment_method:paymentMethod,payment_status:"not_implemented",message:"Tarifa base de piloto guardada; sin pago confirmado."},201);
 }
 // Un pedido vencido no debe aparecer activo mientras espera la limpieza programada.
 // No alterar viajes aceptados o en curso: expires_at solo limita la solicitud inicial.
@@ -199,6 +203,8 @@ async function rideFinancials(env,id){
  return await env.DB.prepare("SELECT f.kind,f.tariff_version,f.base_ars,f.commission_bps,f.wait_free_seconds,f.wait_minute_ars,w.started_at,w.ended_at,t.wait_seconds,t.waiting_ars,t.total_ars,t.commission_ars,t.finalized_at FROM ride_fares f LEFT JOIN ride_waits w ON w.ride_id=f.ride_id LEFT JOIN ride_totals t ON t.ride_id=f.ride_id WHERE f.ride_id=?").bind(id).first();
 }
 async function cashStatus(env,id){
+ const selected=await env.DB.prepare("SELECT method FROM ride_payment_methods WHERE ride_id=?").bind(id).first();
+ if(selected?.method==="mercadopago")return {method:"mercadopago",status:"not_enabled"};
  const row=await env.DB.prepare("SELECT COUNT(*) AS confirmations FROM cash_confirmations WHERE ride_id=?").bind(id).first();
  return {method:"cash",status:row.confirmations===2?"confirmed":row.confirmations===1?"awaiting_counterparty":"unconfirmed",confirmations:row.confirmations};
 }
@@ -207,6 +213,8 @@ async function confirmCash(req,env,user,id){
  if(data.confirm!==true||Object.keys(data).some(k=>k!=="confirm"))throw new ApiError("Confirmá el pago en efectivo.",400);
  const ride=await rideAccess(env,user,id);
  if(ride.status!=="completed")throw new ApiError("El viaje todavía no está finalizado.",409);
+ const selected=await env.DB.prepare("SELECT method FROM ride_payment_methods WHERE ride_id=?").bind(id).first();
+ if(selected?.method==="mercadopago")throw new ApiError("El viaje no admite efectivo.",409);
  const role=ride.rider_id===user.id?"rider":"driver";
  const result=await env.DB.prepare("INSERT INTO cash_confirmations(ride_id,role,user_id,confirmed_at) SELECT r.id,?,?,? FROM rides r JOIN ride_totals t ON t.ride_id=r.id WHERE r.id=? AND r.status='completed' AND ((?='rider' AND r.rider_id=?) OR (?='driver' AND r.driver_id=?)) ON CONFLICT(ride_id,role) DO NOTHING").bind(role,user.id,Date.now(),id,role,user.id,role,user.id).run();
  if(!result.meta?.changes){
@@ -216,9 +224,10 @@ async function confirmCash(req,env,user,id){
  return json({ok:true,payment:await cashStatus(env,id)});
 }
 async function driverLedger(env,user){
- const balance=await env.DB.prepare("SELECT COALESCE(SUM(amount_ars),0) AS commission_due_ars FROM driver_ledger WHERE driver_id=?").bind(user.id).first();
+ const balance=await env.DB.prepare("SELECT (SELECT COALESCE(SUM(amount_ars),0) FROM driver_ledger WHERE driver_id=?) - (SELECT COALESCE(SUM(amount_ars),0) FROM commission_settlements WHERE driver_id=?) AS commission_due_ars").bind(user.id,user.id).first();
  const entries=await env.DB.prepare("SELECT id,ride_id,kind,amount_ars,created_at FROM driver_ledger WHERE driver_id=? ORDER BY created_at DESC,id DESC LIMIT 100").bind(user.id).all();
- return json({ok:true,currency:"ARS",commission_due_ars:balance.commission_due_ars,entries:entries.results||[],settlements_enabled:false});
+ const credits=await env.DB.prepare("SELECT id,amount_ars,verified_at FROM commission_settlements WHERE driver_id=? ORDER BY verified_at DESC,id DESC LIMIT 100").bind(user.id).all();
+ return json({ok:true,currency:"ARS",commission_due_ars:balance.commission_due_ars,entries:entries.results||[],settlements:credits.results||[],settlements_enabled:false});
 }
 async function rideStatus(req,env,user,id){
  liveOnly(env);
