@@ -1,3 +1,4 @@
+import { estimateUrbanFare } from "./tariff.mjs";
 // BM Viajes - API piloto Cloudflare Workers + D1.
 // Falla cerrado: sin ENABLE_LIVE_RIDES=true no acepta viajes reales.
 // No incluye cobros: nunca simular un pago exitoso.
@@ -214,6 +215,15 @@ async function getDriverPosition(env,user,id){
 async function main(req,env){
  if(!env?.DB)throw new ApiError("Base de datos no configurada.",503);
  const url=new URL(req.url),path=url.pathname.replace(/\/$/,""),method=req.method;
+ // Cotización pública de simulación: no crea viajes, no consulta datos personales ni habilita pagos.
+ if(method==="GET"&&path==="/api/fare/estimate"){
+   const q=url.searchParams, allowed=new Set(["kind","night","waitSeconds"]);
+   for(const key of q.keys())if(!allowed.has(key)||q.getAll(key).length!==1)throw new ApiError("Parámetros de tarifa inválidos.",400);
+   const kind=q.get("kind"),night=q.get("night")??"false",wait=q.get("waitSeconds")??"0";
+   if(!["true","false"].includes(night)||!/^\d{1,5}$/.test(wait))throw new ApiError("Parámetros de tarifa inválidos.",400);
+   try{return json({ok:true,estimate:estimateUrbanFare({kind,night:night==="true",waitSeconds:Number(wait)})});}
+   catch(e){if(e instanceof RangeError)throw new ApiError("Modalidad o espera no admitida.",400);throw e;}
+ }
  if(method==="GET"&&path==="/api/health")return json({ok:true,service:"BM Viajes",mode:env.ENABLE_LIVE_RIDES==="true"?"pilot":"demo"});
  if(method==="GET"&&path==="/api/config")return json({ok:true,live_rides_enabled:env.ENABLE_LIVE_RIDES==="true",payments_enabled:false,area:"Ayacucho",fare_calculation:"pending_municipal_tariffs"});
  // La revocación debe seguir disponible incluso con el límite general de POST agotado.
