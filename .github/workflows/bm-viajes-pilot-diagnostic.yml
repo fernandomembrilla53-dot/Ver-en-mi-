@@ -1,0 +1,71 @@
+name: BM Viajes - Diagnóstico remoto sin viajes reales
+on:
+  push:
+    branches: [bm-viajes-pilot-validation-20261114]
+    paths: ['.github/workflows/bm-viajes-pilot-diagnostic.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - name: Comprobar configuración y API publicada sin activar operaciones
+        run: |
+          python3 - <<'PY'
+          import os,json,urllib.request,urllib.error,uuid
+          origin='https://fernandomembrilla53-dot.github.io'
+          base='https://bm-viajes-api.fernandomembrilla53.workers.dev'
+          account='d41d328f1e8a9ba2131aba8b57923f2a'
+          def call(url,method='GET',data=None,headers=None):
+              h={'Accept':'application/json','User-Agent':'BM-Viajes-Safe-Diagnostic/1.0',**(headers or {})}
+              if data is not None: h['Content-Type']='application/json'
+              req=urllib.request.Request(url,data=None if data is None else json.dumps(data).encode(),headers=h,method=method)
+              try:
+                  with urllib.request.urlopen(req,timeout=20) as r: return r.status,json.load(r)
+              except urllib.error.HTTPError as e:
+                  try: return e.code,json.load(e)
+                  except Exception: return e.code,{}
+          results={}
+          status,h=call(base+'/api/health',headers={'Origin':origin})
+          results['health']={'http':status,'mode':h.get('mode'),'database':h.get('database')}
+          status,c=call(base+'/api/config',headers={'Origin':origin})
+          results['config']={'http':status,'live_rides_enabled':c.get('live_rides_enabled'),'payments_enabled':c.get('payments_enabled')}
+          assert results['health']=={'http':200,'mode':'demo','database':'ready'},results
+          assert status==200 and c.get('live_rides_enabled') is False and c.get('payments_enabled') is False,results
+          token=os.environ.get('CF_TOKEN')
+          if token:
+              status,s=call('https://api.cloudflare.com/client/v4/accounts/'+account+'/workers/scripts/bm-viajes-api/secrets',headers={'Authorization':'Bearer '+token})
+              names={x['name'] for x in s.get('result',[]) if isinstance(x,dict)} if s.get('success') else set()
+              results['mail_secrets']={'http':status,'brevo_api_key_present':'BREVO_API_KEY' in names,'mail_from_secret_present':'MAIL_FROM' in names}
+          # Reserved non-deliverable domain; never send to a real person or create a verified account.
+          email='bm-pilot-diagnostic-'+uuid.uuid4().hex[:12]+'@example.invalid'
+          status,v=call(base+'/api/auth/start','POST',{'email':email},{'Origin':origin})
+          results['otp_request']={'http':status,'error':v.get('error'),'ok':v.get('ok')}
+          for label,path,method,data in [
+              ('session_required','/api/me','GET',None),
+              ('passenger_history_protected','/api/rides/mine','GET',None),
+              ('driver_requests_protected','/api/rides/open','GET',None),
+              ('ride_creation_protected','/api/rides','POST',{}),
+              ('gps_read_protected','/api/rides/00000000-0000-4000-8000-000000000001/location','GET',None),
+              ('gps_write_protected','/api/rides/00000000-0000-4000-8000-000000000001/location','POST',{})
+          ]:
+              status,v=call(base+path,method,data,{'Origin':origin})
+              results[label]={'http':status,'error':v.get('error')}
+              assert status in (401,403,503),(label,status)
+          summary=json.dumps(results,ensure_ascii=False,indent=2)
+          print(summary)
+          with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as f:
+              f.write('## Diagnóstico de la API real (sin viajes ni cobros)\n\n```json\n'+summary+'\n```\n')
+          # Publish only a non-sensitive report as an artifact.
+          with open('bm-pilot-diagnostic.json','w') as f: f.write(summary)
+          PY
+      - name: Guardar resultado del diagnóstico
+        uses: actions/upload-artifact@v4
+        with:
+          name: bm-pilot-diagnostic
+          path: bm-pilot-diagnostic.json
+          retention-days: 7
