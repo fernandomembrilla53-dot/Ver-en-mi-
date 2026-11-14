@@ -1,0 +1,117 @@
+name: BM Viajes - Desplegar piloto independiente
+on:
+  push:
+    branches: [bm-viajes-fare-snapshot]
+    paths: ['.github/workflows/bm-viajes-pilot-deploy.yml']
+permissions:
+  contents: read
+concurrency:
+  group: bm-viajes-pilot-deploy
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: d41d328f1e8a9ba2131aba8b57923f2a
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validar backend aislado
+        run: node --test bm-viajes/tests/*.test.mjs
+      - name: Preparar D1 y configuración exclusivamente de piloto
+        working-directory: bm-viajes/backend
+        run: |
+          python3 - <<'PY'
+          import os,json,urllib.request,urllib.error,pathlib
+          token=os.environ.get('CLOUDFLARE_API_TOKEN','')
+          if not token: raise SystemExit('Falta CLOUDFLARE_API_TOKEN en GitHub Actions')
+          account=os.environ['CLOUDFLARE_ACCOUNT_ID']
+          base='https://api.cloudflare.com/client/v4/accounts/'+account
+          def api(path,method='GET',data=None):
+              req=urllib.request.Request(base+path,method=method,headers={'Authorization':'Bearer '+token,'Content-Type':'application/json'},data=None if data is None else json.dumps(data).encode())
+              try:
+                  with urllib.request.urlopen(req,timeout=45) as r: body=json.load(r)
+              except urllib.error.HTTPError as e:
+                  raise SystemExit('Cloudflare rechazó '+method+' '+path+': HTTP '+str(e.code))
+              if not body.get('success'): raise SystemExit('Cloudflare no autorizó '+path)
+              return body['result']
+          databases=api('/d1/database?name=bm-viajes-db&per_page=100')
+          exact=[d for d in databases if d['name']=='bm-viajes-db']
+          if len(exact)>1: raise SystemExit('Nombre D1 ambiguo')
+          database=exact[0] if exact else api('/d1/database','POST',{'name':'bm-viajes-db'})
+          dbid=database['uuid']
+          config={'name':'bm-viajes-api','main':'worker.mjs','compatibility_date':'2026-11-09','workers_dev':True,'vars':{'FRONTEND_ORIGIN':'https://fernandomembrilla53-dot.github.io','ENABLE_LIVE_RIDES':'false','MP_SANDBOX_ENABLED':'false'},'d1_databases':[{'binding':'DB','database_name':'bm-viajes-db','database_id':dbid}]}
+          pathlib.Path('wrangler.json').write_text(json.dumps(config,indent=2))
+          sub=api('/workers/subdomain')['subdomain']
+          url='https://bm-viajes-api.'+sub+'.workers.dev'
+          with open(os.environ['GITHUB_ENV'],'a') as f: f.write('BM_PILOT_URL='+url+'\n')
+          print('D1 bm-viajes-db preparada: '+dbid)
+          PY
+      - name: Instalar herramienta oficial de despliegue
+        run: npm install --no-save --no-package-lock wrangler@4
+      - name: Aplicar esquema y seis migraciones
+        working-directory: bm-viajes/backend
+        run: |
+          ../../node_modules/.bin/wrangler d1 execute bm-viajes-db --remote --config wrangler.json --file schema.sql
+          for migration in migrations/*.sql; do
+            ../../node_modules/.bin/wrangler d1 execute bm-viajes-db --remote --config wrangler.json --file "$migration"
+          done
+      - name: Desplegar con viajes y Mercado Pago deshabilitados
+        working-directory: bm-viajes/backend
+        run: ../../node_modules/.bin/wrangler deploy --config wrangler.json --keep-vars
+      - name: Crear secretos independientes sin mostrarlos ni rotar los existentes
+        working-directory: bm-viajes/backend
+        run: |
+          python3 - <<'PY'
+          import os,json,secrets,urllib.request,subprocess
+          base='https://api.cloudflare.com/client/v4/accounts/'+os.environ['CLOUDFLARE_ACCOUNT_ID']+'/workers/scripts/bm-viajes-api'
+          req=urllib.request.Request(base+'/secrets',headers={'Authorization':'Bearer '+os.environ['CLOUDFLARE_API_TOKEN']})
+          with urllib.request.urlopen(req,timeout=45) as r: body=json.load(r)
+          if not body.get('success'): raise SystemExit('No se pudo verificar nombres de secretos')
+          existing={x['name'] for x in body['result']}
+          for name in ['AUTH_SECRET','MP_VAULT_KEY']:
+              if name in existing:
+                  print(name+': conservado')
+                  continue
+              value=secrets.token_hex(32)
+              if name=='MP_VAULT_KEY':
+                  import base64
+                  value=base64.b64encode(secrets.token_bytes(32)).decode()
+              print('::add-mask::'+value)
+              subprocess.run(['../../node_modules/.bin/wrangler','secret','put',name,'--config','wrangler.json'],input=value+'\n',text=True,check=True)
+          PY
+      - name: Verificar API, D1, CORS y bloqueos
+        run: |
+          python3 - <<'PY'
+          import os,json,time,urllib.request,urllib.error
+          base=os.environ['BM_PILOT_URL']
+          origin='https://fernandomembrilla53-dot.github.io'
+          def get(path,origin=origin):
+              req=urllib.request.Request(base+path,headers={'Origin':origin})
+              with urllib.request.urlopen(req,timeout=25) as r:
+                  assert r.headers.get('Access-Control-Allow-Origin')==origin
+                  return json.load(r)
+          for attempt in range(6):
+              try:
+                  health=get('/api/health')
+                  assert health['database']=='ready' and health['mode']=='demo'
+                  break
+              except Exception:
+                  if attempt==5: raise
+                  time.sleep(5)
+          config=get('/api/config')
+          assert config['live_rides_enabled'] is False and config['payments_enabled'] is False
+          fare=get('/api/fare/estimate?kind=one_way')
+          assert fare['ok'] is True
+          try: get('/api/config','https://example.invalid')
+          except urllib.error.HTTPError as e: assert e.code==403
+          else: raise AssertionError('CORS permitió un origen ajeno')
+          with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as f:
+              f.write('## BM Viajes: infraestructura piloto\n\n'+base+'\n\nD1 conectada; esquema y migraciones aplicados; CORS verificado. Viajes y pagos deshabilitados.\n\nCorreo OTP pendiente de proveedor independiente. No se activaron servicios pagos.\n')
+          print('API piloto verificada: '+base)
+          PY
