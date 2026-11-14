@@ -4,6 +4,7 @@ import {verifyWebhook} from './mp-webhook.mjs';
 import {verifyApprovedPayment} from './mp-verification.mjs';
 import {sandboxReady} from './mp-oauth.mjs';
 import {unseal} from './mp-vault.mjs';
+import {refreshDriverToken} from './mp-refresh.mjs';
 // The ride hint is untrusted: provider identity, reference and amount must all match.
 export async function receivePayment(env,req,fetcher=fetch){
  if(!sandboxReady(env)||!env.MP_WEBHOOK_SECRET)return 503;
@@ -12,8 +13,10 @@ export async function receivePayment(env,req,fetcher=fetch){
  if(q.getAll('ride').length!==1||! /^[0-9a-f-]{36}$/.test(ride??'')||! /^[1-9]\d{0,19}$/.test(payment??''))return 400;
  const db=env.DB;
  const r=await db.prepare(`SELECT i.ride_id,i.seller_id,i.external_reference,i.status,t.total_ars,r.driver_id,a.token_cipher,a.expires_at FROM mp_checkout_intents i JOIN ride_totals t ON t.ride_id=i.ride_id JOIN rides r ON r.id=i.ride_id JOIN mp_driver_accounts a ON a.driver_id=r.driver_id AND a.seller_id=i.seller_id WHERE i.ride_id=?`).bind(ride).first();
- if(!r||r.expires_at<=Date.now())return 503;
- const token=(await unseal(env.MP_VAULT_KEY,r.driver_id,r.token_cipher)).access_token;
+ if(!r)return 503;
+ let token;
+ try{const account=await refreshDriverToken(env,r.driver_id,fetcher,Date.now,r.seller_id);
+ token=(await unseal(env.MP_VAULT_KEY,r.driver_id,account.token_cipher)).access_token;}catch{return 503;}
  const response=await fetcher('https://api.mercadopago.com/v1/payments/'+payment,{headers:{Authorization:'Bearer '+token}});
  if(!response.ok)return 503;
  const p=await response.json();
