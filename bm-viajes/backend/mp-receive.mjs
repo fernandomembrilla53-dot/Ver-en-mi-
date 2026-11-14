@@ -1,3 +1,5 @@
+import {verifiedReversal} from './mp-reversal.mjs';
+import {storeReversal} from './mp-reversal-store.mjs';
 import {verifyWebhook} from './mp-webhook.mjs';
 import {verifyApprovedPayment} from './mp-verification.mjs';
 import {sandboxReady} from './mp-oauth.mjs';
@@ -16,7 +18,14 @@ export async function receivePayment(env,req,fetcher=fetch){
  if(!response.ok)return 503;
  const p=await response.json();
  if(String(p.id)!==payment)return 409;
- if(p.status!=='approved'||p.transaction_amount_refunded!==0)return 202; // reconciliation/refunds handled separately
+ const prior=await db.prepare('SELECT payment_id,amount_ars FROM mp_verified_payments WHERE ride_id=?').bind(ride).first();
+ if(prior){
+   if(prior.payment_id!==payment)return 409;
+   let reversal;try{reversal=verifiedReversal(p,{paymentId:payment,reference:r.external_reference,amountArs:prior.amount_ars,collectorId:r.seller_id});}catch{return 409;}
+   await storeReversal(db,payment,ride,reversal);
+   return 200;
+ }
+ if(p.status!=='approved'||p.transaction_amount_refunded!==0)return 202; // unverified reversal requires review
  let verified;try{verified=verifyApprovedPayment(p,{reference:r.external_reference,amountArs:r.total_ars,collectorId:r.seller_id,liveMode:false});}catch{return 409;}
  await db.batch([
  db.prepare("INSERT INTO mp_verified_payments(payment_id,ride_id,amount_ars,verified_at) SELECT ?,?,?,? WHERE EXISTS(SELECT 1 FROM mp_checkout_intents WHERE ride_id=? AND status IN ('ready','review','paid')) ON CONFLICT DO NOTHING").bind(verified.providerReference,ride,verified.amountArs,Date.now(),ride),
