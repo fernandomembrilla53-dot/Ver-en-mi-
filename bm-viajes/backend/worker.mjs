@@ -52,7 +52,7 @@ function coords(data,key){
 function cors(req,env){
  const origin=req.headers.get("Origin");
  const allowed=env.FRONTEND_ORIGIN;
- return origin&&origin===allowed?{"Access-Control-Allow-Origin":origin,"Vary":"Origin","Access-Control-Allow-Methods":"GET, POST, OPTIONS","Access-Control-Allow-Headers":"Authorization, Content-Type","Access-Control-Max-Age":"600"}:{};
+ return origin&&(origin===allowed||origin===new URL(req.url).origin)?{"Access-Control-Allow-Origin":origin,"Vary":"Origin","Access-Control-Allow-Methods":"GET, POST, OPTIONS","Access-Control-Allow-Headers":"Authorization, Content-Type","Access-Control-Max-Age":"600"}:{};
 }
 function withCors(response,headers){
  const h=new Headers(response.headers);Object.entries(headers).forEach(([k,v])=>h.set(k,v));
@@ -362,7 +362,7 @@ export default {
    const c=cors(request,env);
    if(request.method==="OPTIONS")return withCors(Object.keys(c).length?new Response(null,{status:204}):error("Origen no autorizado.",403),c);
    const origin=request.headers.get("Origin");
-   if(origin&&origin!==env.FRONTEND_ORIGIN)return error("Origen no autorizado.",403);
+   if(origin&&origin!==env.FRONTEND_ORIGIN&&origin!==new URL(request.url).origin)return error("Origen no autorizado.",403);
    try{return withCors(await main(request,env),c);}
    catch(e){
       const status=e instanceof ApiError?e.status:500;

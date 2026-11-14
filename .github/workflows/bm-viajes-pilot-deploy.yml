@@ -3,8 +3,7 @@ on:
   push:
     branches: [bm-viajes-fare-snapshot]
     paths:
-      - 'bm-viajes/backend/**'
-      - 'bm-viajes/tests/**'
+      - 'bm-viajes/**'
       - '.github/workflows/bm-viajes-pilot-deploy.yml'
 permissions:
   contents: read
@@ -48,8 +47,17 @@ jobs:
           if len(exact)>1: raise SystemExit('Nombre D1 ambiguo')
           database=exact[0] if exact else api('/d1/database','POST',{'name':'bm-viajes-db'})
           dbid=database['uuid']
-          config={'name':'bm-viajes-api','main':'worker.mjs','compatibility_date':'2026-11-09','workers_dev':True,'vars':{'FRONTEND_ORIGIN':'https://fernandomembrilla53-dot.github.io','ENABLE_LIVE_RIDES':'false','MP_SANDBOX_ENABLED':'false'},'d1_databases':[{'binding':'DB','database_name':'bm-viajes-db','database_id':dbid}]}
+          config=json.loads(pathlib.Path('wrangler.json').read_text())
+          assert config['name']=='bm-viajes-api' and config['vars']['ENABLE_LIVE_RIDES']=='false'
+          assert config['vars']['MP_SANDBOX_ENABLED']=='false'
+          config['d1_databases'][0]['database_id']=dbid
           pathlib.Path('wrangler.json').write_text(json.dumps(config,indent=2))
+          import shutil
+          public=pathlib.Path('public/bm-viajes')
+          public.mkdir(parents=True,exist_ok=True)
+          for source in pathlib.Path('..').iterdir():
+              if source.is_file() and source.suffix in ['.html','.js','.css','.png','.svg','.webmanifest']:
+                  shutil.copy2(source,public/source.name)
           sub=api('/workers/subdomain')['subdomain']
           url='https://bm-viajes-api.'+sub+'.workers.dev'
           with open(os.environ['GITHUB_ENV'],'a') as f: f.write('BM_PILOT_URL='+url+'\n')
@@ -95,7 +103,7 @@ jobs:
           base=os.environ['BM_PILOT_URL']
           origin='https://fernandomembrilla53-dot.github.io'
           def get(path,origin=origin):
-              req=urllib.request.Request(base+path,headers={'Origin':origin})
+              req=urllib.request.Request(base+path,headers={'Origin':origin,'User-Agent':'BM-Viajes-Pilot-Check/1.0'})
               with urllib.request.urlopen(req,timeout=25) as r:
                   assert r.headers.get('Access-Control-Allow-Origin')==origin
                   return json.load(r)
