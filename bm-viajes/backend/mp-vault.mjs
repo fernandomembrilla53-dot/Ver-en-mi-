@@ -1,0 +1,6 @@
+const enc=new TextEncoder(), dec=new TextDecoder();
+const b64=b=>btoa(String.fromCharCode(...b)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+const un64=s=>Uint8Array.from(atob(s.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0));
+async function key(secret){const raw=un64(secret);if(raw.length!==32)throw Error('Invalid vault key');return crypto.subtle.importKey('raw',raw,'AES-GCM',false,['encrypt','decrypt']);}
+export async function seal(secret,driverId,tokens){if(!driverId||!tokens.access_token||!tokens.refresh_token)throw Error('Invalid credentials');const iv=crypto.getRandomValues(new Uint8Array(12));const cipher=await crypto.subtle.encrypt({name:'AES-GCM',iv,additionalData:enc.encode('bm-viajes:mp:v1:'+driverId)},await key(secret),enc.encode(JSON.stringify(tokens)));return 'v1.'+b64(iv)+'.'+b64(new Uint8Array(cipher));}
+export async function unseal(secret,driverId,blob){const [v,iv,cipher,...rest]=blob.split('.');if(v!=='v1'||rest.length||!iv||!cipher)throw Error('Invalid vault record');return JSON.parse(dec.decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:un64(iv),additionalData:enc.encode('bm-viajes:mp:v1:'+driverId)},await key(secret),un64(cipher))));}
