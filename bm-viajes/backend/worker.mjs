@@ -1,3 +1,5 @@
+import {maps} from "./maps.mjs";
+import {operations} from "./operations.mjs";
 import {receivePayment} from "./mp-receive.mjs";
 import {createRideCheckout} from "./mp-checkout.mjs";
 import {sandboxReady,beginOAuth,finishOAuth} from "./mp-oauth.mjs";
@@ -14,7 +16,7 @@ const sha256=async(value)=>Array.from(new Uint8Array(await crypto.subtle.digest(
 const randomHex=(length=32)=>Array.from(crypto.getRandomValues(new Uint8Array(length))).map(x=>x.toString(16).padStart(2,"0")).join("");
 const jsonInput=async(request)=>{
   if((request.headers.get("Content-Type")||"").split(";")[0].trim().toLowerCase()!=="application/json")throw new ApiError("Enviá JSON.",415);
-  const limit=6000;
+  const limit=new URL(request.url).pathname==="/api/driver/documents"?125000:6000;
   const declared=request.headers.get("Content-Length");
   if(declared!==null&&Number(declared)>limit)throw new ApiError("Solicitud demasiado grande.",413);
   if(!request.body)throw new ApiError("JSON incorrecto.",400);
@@ -69,6 +71,7 @@ async function authenticate(req,env){
  if(!/^Bearer [0-9a-f]{64}$/.test(header))throw new ApiError("Necesitás iniciar sesión.",401);
  const hash=await sha256(header.slice(7));
  const found=await env.DB.prepare("SELECT u.id,u.email,u.driver_status FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>?").bind(hash,Date.now()).first();
+ if(found&&await env.DB.prepare("SELECT user_id FROM blocked_users WHERE user_id=?").bind(found.id).first())throw new ApiError("Cuenta bloqueada. Contactá a soporte.",403);
  if(!found)throw new ApiError("Sesión inválida o vencida.",401);
  return found;
 }
@@ -149,6 +152,7 @@ async function newRide(req,env,user){
  if(paymentMethod==="mercadopago")throw new ApiError("Mercado Pago todavía no está habilitado.",503);
  const night=Number(new Intl.DateTimeFormat("en-GB",{timeZone:"America/Argentina/Buenos_Aires",hour:"2-digit",hourCycle:"h23"}).format(new Date(now)));
  let fare;try{fare=estimateUrbanFare({kind,night:night>=22||night<6});}catch(e){if(e instanceof RangeError)throw new ApiError("Modalidad sin tarifa definida.",400);throw e;}
+ if(input.quoted_base_ars!==undefined&&input.quoted_base_ars!==fare.base)throw new ApiError("La tarifa cambió. Consultá y confirmá el nuevo importe.",409);
  const insertRide=env.DB.prepare("INSERT INTO rides(id,rider_id,origin_lat,origin_lng,destination_lat,destination_lng,distance_air_km,status,created_at,updated_at,expires_at) SELECT ?,?,?,?,?,?,?,'requested',?,?,? WHERE NOT EXISTS (SELECT 1 FROM rides WHERE (rider_id=? AND (status IN ('accepted','in_progress') OR (status='requested' AND expires_at>?))) OR (driver_id=? AND status IN ('accepted','in_progress')))").bind(id,user.id,a.lat,a.lng,b.lat,b.lng,Number(air.toFixed(2)),now,now,now+15*60000,user.id,now,user.id);
  const insertFare=env.DB.prepare("INSERT INTO ride_fares(ride_id,kind,tariff_version,base_ars,commission_bps,wait_free_seconds,wait_minute_ars,created_at) SELECT id,?,?,?,?,?,?,? FROM rides WHERE id=?").bind(kind,fare.version,fare.base,TARIFF.commissionPercent*100,kind==="round_trip"?TARIFF.freeWaitSeconds:0,kind==="round_trip"?TARIFF.waitPerMinute:0,now,id);
  const insertMethod=env.DB.prepare("INSERT INTO ride_payment_methods(ride_id,method) SELECT id,? FROM rides WHERE id=?").bind(paymentMethod,id);
@@ -170,7 +174,10 @@ async function openRides(env,user){
  driverOnly(user);liveOnly(env);
  const result=await env.DB.prepare("SELECT id,origin_lat,origin_lng,destination_lat,destination_lng,distance_air_km,created_at FROM rides WHERE status='requested' AND expires_at>? AND rider_id<>? AND EXISTS (SELECT 1 FROM users WHERE id=? AND driver_status='approved') ORDER BY created_at LIMIT 20").bind(Date.now(),user.id,user.id).all();
  const rides=(result.results||[]).map(r=>({id:r.id,origin:{lat:Number(r.origin_lat.toFixed(3)),lng:Number(r.origin_lng.toFixed(3))},destination_area:{lat:Number(r.destination_lat.toFixed(3)),lng:Number(r.destination_lng.toFixed(3))},distance_air_km:r.distance_air_km,created_at:r.created_at}));
- return json({ok:true,rides});
+ const declined=await env.DB.prepare("SELECT ride_id FROM ride_declines WHERE driver_id=?").bind(user.id).all();
+ const excluded=new Set(declined.results.map(x=>x.ride_id));
+ const position=await env.DB.prepare("SELECT lat,lng FROM driver_availability WHERE user_id=? AND available=1 AND updated_at>?").bind(user.id,Date.now()-120000).first();
+ return json({ok:true,rides:rides.filter(r=>!excluded.has(r.id)&&(!position||haversine(position,r.origin)<=5))});
 }
 async function rideAccess(env,user,id){
  const ride=await env.DB.prepare("SELECT * FROM rides WHERE id=?").bind(id).first();
@@ -266,6 +273,7 @@ async function driverPosition(req,env,user,id){
  const body=await jsonInput(req),p=coords({position:body?.position},"position"),accuracy=body?.accuracy_m;
  if(!Number.isFinite(accuracy)||accuracy<0||accuracy>300)throw new ApiError("GPS insuficientemente preciso.",400);
  const now=Date.now();
+ if(env.ENFORCE_DRIVER_REVIEW==="true"&&(!Number.isFinite(body.sampled_at)||body.sampled_at<now-30000||body.sampled_at>now+5000))throw new ApiError("La muestra GPS está vencida.",400);
  // Revalidar asignación y aprobación en la escritura: cancelación o suspensión concurrente bloquean el GPS.
  // Una escritura atrasada no puede reemplazar una posición más reciente.
  const saved=await env.DB.prepare("INSERT INTO ride_positions(ride_id,driver_id,lat,lng,accuracy_m,updated_at) SELECT id,driver_id,?,?,?,? FROM rides WHERE id=? AND driver_id=? AND status IN ('accepted','in_progress') AND EXISTS (SELECT 1 FROM users WHERE id=rides.driver_id AND driver_status='approved') ON CONFLICT(ride_id) DO UPDATE SET lat=excluded.lat,lng=excluded.lng,accuracy_m=excluded.accuracy_m,updated_at=excluded.updated_at WHERE excluded.updated_at>=ride_positions.updated_at AND EXISTS (SELECT 1 FROM rides JOIN users ON users.id=rides.driver_id WHERE rides.id=excluded.ride_id AND rides.driver_id=excluded.driver_id AND rides.status IN ('accepted','in_progress') AND users.driver_status='approved')").bind(p.lat,p.lng,accuracy,now,id,user.id).run();
@@ -283,6 +291,12 @@ async function getDriverPosition(env,user,id){
 }
 async function main(req,env){
  const url=new URL(req.url),path=url.pathname.replace(/\/$/,""),method=req.method;
+ if(method==="GET"&&path==="/api/fare/current"){
+   const kind=url.searchParams.get("kind");
+   const hour=Number(new Intl.DateTimeFormat("en-GB",{timeZone:"America/Argentina/Buenos_Aires",hour:"2-digit",hourCycle:"h23"}).format(new Date()));
+   try{return json({ok:true,estimate:estimateUrbanFare({kind,night:hour>=22||hour<6}),quoted_at:Date.now()});}
+   catch{throw new ApiError("Modalidad sin tarifa definida para este horario.",400);}
+ }
  // Cotización pública de simulación: no crea viajes, no consulta datos personales ni habilita pagos.
  if(method==="GET"&&path==="/api/fare/estimate"){
    const q=url.searchParams, allowed=new Set(["kind","night","waitSeconds"]);
@@ -297,8 +311,8 @@ async function main(req,env){
  if(method==="GET"&&path==="/api/health"){
    // Comprobar conectividad y presencia de tablas sin leer datos personales.
    try{
-     const ready=await env.DB.prepare("SELECT COUNT(*) AS ready_tables FROM sqlite_master WHERE type='table' AND name IN ('users','otp_challenges','sessions','rate_limits','rides','ride_positions','ride_fares','ride_waits','ride_totals','cash_confirmations','driver_ledger','ride_payment_methods','commission_settlements','mp_oauth_states','mp_driver_accounts','mp_checkout_intents','mp_verified_payments','mp_payment_reversals')").first();
-     if(ready?.ready_tables!==18)throw new Error("Schema incomplete");
+     const ready=await env.DB.prepare("SELECT COUNT(*) AS ready_tables FROM sqlite_master WHERE type='table' AND name IN ('users','otp_challenges','sessions','rate_limits','rides','ride_positions','ride_fares','ride_waits','ride_totals','cash_confirmations','driver_ledger','ride_payment_methods','commission_settlements','mp_oauth_states','mp_driver_accounts','mp_checkout_intents','mp_verified_payments','mp_payment_reversals','admin_users','blocked_users','driver_profiles','driver_documents','driver_availability','ride_ratings','incidents','admin_audit','tariff_proposals','ride_declines','map_requests','map_cache')").first();
+     if(ready?.ready_tables!==30)throw new Error("Schema incomplete");
    }catch(e){throw new ApiError("Base de datos no disponible o esquema incompleto.",503);}
    return json({ok:true,service:"BM Viajes",mode:env.ENABLE_LIVE_RIDES==="true"?"pilot":"demo",database:"ready"});
  }
@@ -310,7 +324,7 @@ async function main(req,env){
  if(method==="POST"){
    if(!env.AUTH_SECRET||env.AUTH_SECRET.length<32)throw new ApiError("Autenticación segura pendiente de configuración.",503);
    // GPS tiene un presupuesto separado: no agotar autenticación ni acciones del viaje.
-   const gpsPost=/^\/api\/rides\/[0-9a-f-]{36}\/location$/.test(path);
+   const gpsPost=path==="/api/driver/availability"||/^\/api\/rides\/[0-9a-f-]{36}\/location$/.test(path);
    await rateLimit(env,(gpsPost?"gps-ip:":"ip:")+await sha256(ip+"|"+env.AUTH_SECRET),gpsPost?240:60,gpsPost?60000:3600000);
  }
  if(method==="POST"&&path==="/api/auth/start")return startAuth(req,env);
@@ -320,6 +334,13 @@ async function main(req,env){
    try{return json({ok:true,...await finishOAuth(env,url.searchParams.get("state"),url.searchParams.get("code"))});}catch{throw new ApiError("No se pudo vincular la cuenta. Reiniciá la autorización.",400);}
  }
  const user=await authenticate(req,env);
+ if(env.ENFORCE_DRIVER_REVIEW==="true"&&((path==="/api/rides/open")||(/\/accept$/.test(path)))){
+   const ready=await env.DB.prepare("SELECT a.lat,a.lng FROM driver_availability a WHERE a.user_id=? AND a.available=1 AND a.updated_at>? AND (SELECT COUNT(*) FROM driver_documents d WHERE d.user_id=a.user_id AND d.review_status='approved' AND d.expires_at>?)=5").bind(user.id,Date.now()-120000,Date.now()).first();
+   if(!ready)throw new ApiError("Activá disponibilidad con GPS reciente y documentación vigente.",403);
+ }
+ const mapped=await maps(req,env,user,{json,ApiError});if(mapped)return mapped;
+ const operational=await operations(req,env,user,{json,error,input:jsonInput,access:rideAccess,ApiError});
+ if(operational)return operational;
  if(method==="POST"&&path==="/api/driver/mp/oauth"){
    driverOnly(user);if(!sandboxReady(env))throw new ApiError("Mercado Pago de prueba no configurado.",503);
    return json({ok:true,authorization_url:await beginOAuth(env,user)});
@@ -372,6 +393,8 @@ export default {
  async scheduled(event,env,ctx){
    const now=Date.now();
    ctx.waitUntil(Promise.all([
+    env.DB.prepare("DELETE FROM map_cache WHERE expires_at<?").bind(now).run(),
+    env.DB.prepare("DELETE FROM mp_oauth_states WHERE expires_at<?").bind(now).run(),
     env.DB.prepare("DELETE FROM otp_challenges WHERE expires_at<?").bind(now).run(),
     env.DB.prepare("DELETE FROM sessions WHERE expires_at<?").bind(now).run(),
     env.DB.prepare("DELETE FROM ride_positions WHERE updated_at<?").bind(now-180000).run(),

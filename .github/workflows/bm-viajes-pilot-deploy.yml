@@ -25,6 +25,11 @@ jobs:
           node-version: '22'
       - name: Validar backend aislado
         run: node --test bm-viajes/tests/*.test.mjs
+      - name: Probar dos sesiones móviles independientes
+        run: |
+          npm install --no-save --no-package-lock playwright@1.62.1
+          npx playwright install --with-deps chromium
+          node bm-viajes/tests/two-sessions.mjs
       - name: Preparar D1 y configuración exclusivamente de piloto
         working-directory: bm-viajes/backend
         run: |
@@ -65,13 +70,19 @@ jobs:
           PY
       - name: Instalar herramienta oficial de despliegue
         run: npm install --no-save --no-package-lock wrangler@4
-      - name: Aplicar esquema y seis migraciones
+      - name: Registrar punto de recuperación D1
+        working-directory: bm-viajes/backend
+        run: ../../node_modules/.bin/wrangler d1 time-travel info bm-viajes-db --config wrangler.json
+      - name: Aplicar esquema y migraciones ordenadas
         working-directory: bm-viajes/backend
         run: |
           ../../node_modules/.bin/wrangler d1 execute bm-viajes-db --remote --config wrangler.json --file schema.sql
           for migration in migrations/*.sql; do
             ../../node_modules/.bin/wrangler d1 execute bm-viajes-db --remote --config wrangler.json --file "$migration"
           done
+      - name: Verificar integridad D1
+        working-directory: bm-viajes/backend
+        run: ../../node_modules/.bin/wrangler d1 execute bm-viajes-db --remote --config wrangler.json --command "PRAGMA quick_check; PRAGMA foreign_key_check;"
       - name: Desplegar con viajes y Mercado Pago deshabilitados
         working-directory: bm-viajes/backend
         run: ../../node_modules/.bin/wrangler deploy --config wrangler.json --keep-vars
@@ -85,12 +96,12 @@ jobs:
           with urllib.request.urlopen(req,timeout=45) as r: body=json.load(r)
           if not body.get('success'): raise SystemExit('No se pudo verificar nombres de secretos')
           existing={x['name'] for x in body['result']}
-          for name in ['AUTH_SECRET','MP_VAULT_KEY']:
+          for name in ['AUTH_SECRET','MP_VAULT_KEY','DOCUMENT_VAULT_KEY']:
               if name in existing:
                   print(name+': conservado')
                   continue
               value=secrets.token_hex(32)
-              if name=='MP_VAULT_KEY':
+              if name in ['MP_VAULT_KEY','DOCUMENT_VAULT_KEY']:
                   import base64
                   value=base64.b64encode(secrets.token_bytes(32)).decode()
               print('::add-mask::'+value)
