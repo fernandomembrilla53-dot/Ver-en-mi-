@@ -9,7 +9,8 @@ export async function createRideCheckout(env,user,rideId,fetcher=fetch){
  if(!r||r.expires_at<=Date.now())throw Error('Ride or seller unavailable');
  const previous=await db.prepare('SELECT status,checkout_url FROM mp_checkout_intents WHERE ride_id=?').bind(rideId).first();
  if(previous){if(previous.status==='ready')return {checkout_url:previous.checkout_url};throw Error('Checkout requires reconciliation');}
- const body=ridePreference({rideId,total:r.total_ars,commission:r.commission_ars,notificationUrl:env.MP_WEBHOOK_URL});
+ const notification=new URL(env.MP_WEBHOOK_URL);notification.searchParams.set('ride',rideId);
+ const body=ridePreference({rideId,total:r.total_ars,commission:r.commission_ars,notificationUrl:notification.href});
  const token=(await unseal(env.MP_VAULT_KEY,r.driver_id,r.token_cipher)).access_token;
  const reserved=await db.prepare("INSERT INTO mp_checkout_intents(ride_id,seller_id,external_reference,status,created_at) VALUES(?,?,?,'creating',?) ON CONFLICT(ride_id) DO NOTHING").bind(rideId,r.seller_id,body.external_reference,Date.now()).run();
  if(reserved.meta.changes!==1)throw Error('Checkout already reserved');
