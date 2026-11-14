@@ -174,3 +174,7 @@ CREATE TABLE IF NOT EXISTS mp_verified_payments (
  amount_ars INTEGER NOT NULL CHECK(amount_ars>0),
  verified_at INTEGER NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS mp_payment_reversals(payment_id TEXT PRIMARY KEY REFERENCES mp_verified_payments(payment_id), kind TEXT NOT NULL CHECK(kind IN ('refund','partial_refund','chargeback')), amount_ars INTEGER NOT NULL CHECK(amount_ars>0), observed_at INTEGER NOT NULL);
+CREATE TRIGGER IF NOT EXISTS mp_reversal_guard BEFORE INSERT ON mp_payment_reversals WHEN NOT EXISTS(SELECT 1 FROM mp_verified_payments p WHERE p.payment_id=NEW.payment_id AND NEW.amount_ars<=p.amount_ars AND ((NEW.kind='partial_refund' AND NEW.amount_ars<p.amount_ars) OR (NEW.kind<>'partial_refund' AND NEW.amount_ars=p.amount_ars))) BEGIN SELECT RAISE(ABORT,'invalid reversal'); END;
+CREATE TRIGGER IF NOT EXISTS mp_reversal_monotonic BEFORE UPDATE ON mp_payment_reversals WHEN NEW.payment_id<>OLD.payment_id OR NEW.amount_ars<OLD.amount_ars OR (OLD.kind='chargeback' AND NEW.kind<>'chargeback') BEGIN SELECT RAISE(ABORT,'reversal regression'); END;
