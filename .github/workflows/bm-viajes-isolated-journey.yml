@@ -1,0 +1,164 @@
+name: BM Viajes - Viaje ficticio Cloudflare aislado
+on:
+  push:
+    branches: [bm-viajes-pilot-validation-20261114]
+    paths: ['.github/workflows/bm-viajes-isolated-journey.yml']
+permissions:
+  contents: read
+concurrency:
+  group: bm-viajes-isolated-journey
+  cancel-in-progress: false
+jobs:
+  journey:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: d41d328f1e8a9ba2131aba8b57923f2a
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 6958a6f0d5d2e5f7c50db7c39140d9350a2a9186
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Wrangler
+        run: npm install --no-save --no-package-lock wrangler@4
+      - name: Ejecutar viaje privado en Worker y D1 temporales
+        working-directory: bm-viajes/backend
+        run: |
+          python3 - <<'PY'
+          import os,json,uuid,secrets,time,hashlib,base64,subprocess,pathlib,urllib.request,urllib.error
+          root='https://api.cloudflare.com/client/v4/accounts/'+os.environ['CLOUDFLARE_ACCOUNT_ID']
+          cf_token=os.environ['CLOUDFLARE_API_TOKEN']
+          assert cf_token
+          name='bm-viajes-validation-'+os.environ['GITHUB_RUN_ID']+'-'+os.environ['GITHUB_RUN_ATTEMPT']
+          gate=secrets.token_hex(32); auth=secrets.token_hex(32); vault=base64.b64encode(secrets.token_bytes(32)).decode()
+          for v in (gate,auth,vault): print('::add-mask::'+v)
+          def request(url,method='GET',data=None,headers=None):
+              h={'Accept':'application/json','User-Agent':'BM-Viajes-Isolated-Validation/1.0',**(headers or {})}
+              if data is not None: h['Content-Type']='application/json'
+              req=urllib.request.Request(url,method=method,headers=h,data=None if data is None else json.dumps(data).encode())
+              try:
+                  with urllib.request.urlopen(req,timeout=45) as r: return r.status,json.load(r)
+              except urllib.error.HTTPError as e:
+                  try: return e.code,json.load(e)
+                  except Exception: return e.code,{}
+          def cf(path,method='GET',data=None):
+              status,b=request(root+path,method,data,{'Authorization':'Bearer '+cf_token})
+              if not b.get('success'): raise RuntimeError('Cloudflare '+method+' '+path+' HTTP '+str(status))
+              return b['result']
+          def wrangler(*args,stdin=None):
+              subprocess.run(['../../node_modules/.bin/wrangler',*args,'--config','validation-wrangler.json'],input=stdin,text=True,check=True)
+          def now(): return int(time.time()*1000)
+          def sha(s): return hashlib.sha256(s.encode()).hexdigest()
+          def public_check():
+              for path in ('/api/health','/api/config'):
+                  status,b=request('https://bm-viajes-api.fernandomembrilla53.workers.dev'+path)
+                  assert status==200,(path,status)
+                  if path.endswith('health'): assert b['database']=='ready' and b['mode']=='demo'
+                  else: assert b['live_rides_enabled'] is False and b['payments_enabled'] is False
+          public_check()
+          dbid=None; deployed=False; checks=[]
+          def passed(s): checks.append(s);print('PASS: '+s,flush=True)
+          try:
+              db=cf('/d1/database','POST',{'name':name}); dbid=db['uuid']
+              assert db['name']==name
+              sub=cf('/workers/subdomain')['subdomain']
+              base='https://'+name+'.'+sub+'.workers.dev'
+              pathlib.Path('validation-worker.mjs').write_text('import worker from "./worker.mjs"; export default { async fetch(req,env){ if(!env.VALIDATION_KEY || req.headers.get("X-Validation-Key")!==env.VALIDATION_KEY) return new Response("Forbidden",{status:403}); return worker.fetch(req,env); }};')
+              pathlib.Path('validation-wrangler.json').write_text(json.dumps({'name':name,'main':'validation-worker.mjs','compatibility_date':'2026-11-09','workers_dev':True,'vars':{'ENABLE_LIVE_RIDES':'true','MP_SANDBOX_ENABLED':'false','ENFORCE_DRIVER_REVIEW':'true','FRONTEND_ORIGIN':base,'EMAIL_PROVIDER':'gmail'},'d1_databases':[{'binding':'DB','database_name':name,'database_id':dbid}]}))
+              wrangler('d1','execute',name,'--remote','--file','schema.sql')
+              deployed=True
+              wrangler('deploy')
+              wrangler('secret','bulk',stdin=json.dumps({'VALIDATION_KEY':gate,'AUTH_SECRET':auth,'DOCUMENT_VAULT_KEY':vault}))
+              def sql(statement,params=[]):
+                  return cf('/d1/database/'+dbid+'/query','POST',{'sql':statement,'params':params})
+              def api(path,method='GET',data=None,token=None,expected=200):
+                  headers={'X-Validation-Key':gate}
+                  if token: headers['Authorization']='Bearer '+token
+                  status,b=request(base+path,method,data,headers)
+                  assert status==expected,(path,method,status,expected,b.get('error'))
+                  return b
+              for attempt in range(8):
+                  try:
+                      assert api('/api/health')['database']=='ready'
+                      break
+                  except Exception:
+                      if attempt==7: raise
+                      time.sleep(5)
+              status,_=request(base+'/api/health');assert status==403
+              assert api('/api/config')['payments_enabled'] is False
+              passed('Worker aislado protegido; D1 real, cobros deshabilitados; piloto público intacto')
+              def login(role):
+                  email=role+'@example.invalid'; code=str(secrets.randbelow(1000000)).zfill(6)
+                  stamp=now()
+                  # Seed only the challenge, not a user or session. Production verify creates both.
+                  sql('INSERT INTO otp_challenges(email,code_hash,expires_at,last_sent_at,attempts) VALUES(?,?,?,?,0)',[email,sha(email+'|'+code+'|'+auth),stamp+600000,stamp])
+                  session=api('/api/auth/verify','POST',{'email':email,'code':code})
+                  api('/api/auth/verify','POST',{'email':email,'code':code},expected=401)
+                  assert api('/api/me',token=session['token'])['user']['id']==session['user']['id']
+                  return session['token'],session['user']['id']
+              passenger,pid=login('passenger');driver,did=login('driver');admin,aid=login('admin');outsider,oid=login('outsider')
+              sql('INSERT INTO admin_users(user_id) VALUES(?)',[aid])
+              passed('OTP verificado, cuentas y sesiones independientes en D1, reutilización rechazada (correo simulado)')
+              api('/api/driver/profile','POST',{'display_name':'Conductor ficticio','vehicle':'Vehiculo ficticio','plate':'TEST 001'},driver)
+              api('/api/driver/availability','POST',{'available':True},driver,403)
+              fakepng='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+XG1sAAAAASUVORK5CYII='
+              for kind in ('identity','license','permit','insurance','vtv'):
+                  api('/api/driver/documents','POST',{'kind':kind,'expires_at':now()+86400000,'mime':'image/png','data':fakepng},driver)
+                  path='/api/admin/drivers/'+did+'/documents/'+kind
+                  assert api(path,token=admin)['document']['data']==fakepng
+                  api(path,'POST',{'status':'approved','reason':'Documento sintético, prueba privada'},admin)
+              api('/api/admin/drivers/'+did,'POST',{'status':'approved','reason':'Prueba exclusivamente ficticia'},admin)
+              a={'lat':-37.1515,'lng':-58.4859};b={'lat':-37.165,'lng':-58.49}
+              api('/api/driver/availability','POST',{'available':True,**a,'accuracy_m':10,'sampled_at':now()},driver)
+              passed('Revisión de conductor, cinco documentos sintéticos cifrados y disponibilidad GPS')
+              quote=api('/api/fare/current?kind=one_way')['estimate']['base']
+              ride=api('/api/rides','POST',{'origin':a,'destination':b,'kind':'one_way','payment_method':'cash','quoted_base_ars':quote},passenger,201)
+              rid=ride['ride_id'];path='/api/rides/'+rid
+              assert ride['fare_ars']==quote
+              assert any(r['id']==rid for r in api('/api/rides/open',token=driver)['rides'])
+              api(path,token=outsider,expected=403)
+              api(path+'/accept','POST',{},driver)
+              assert api(path,token=passenger)['ride']['driver_id']==did
+              assert api(path+'/driver',token=passenger)['driver']['display_name']=='Conductor ficticio'
+              api(path+'/status','POST',{'status':'in_progress'},driver)
+              assert api(path,token=passenger)['ride']['status']=='in_progress'
+              passed('Pedido, recepción por conductor, aceptación, identidad visible y comienzo sincronizado')
+              api(path+'/location','POST',{'position':a,'accuracy_m':10,'sampled_at':now()-60000},driver,400)
+              for pos in (a,{'lat':-37.16,'lng':-58.488},b):
+                  api(path+'/location','POST',{'position':pos,'accuracy_m':10,'sampled_at':now()},driver)
+                  got=api(path+'/location',token=passenger)['position']
+                  assert got['lat']==pos['lat'] and got['lng']==pos['lng']
+              api(path+'/location',token=outsider,expected=403)
+              passed('Tres posiciones GPS en Cloudflare, actualización visible y acceso ajeno bloqueado')
+              completed=api(path+'/status','POST',{'status':'completed'},driver)
+              assert completed['financials']['total_ars']==quote
+              assert completed['financials']['commission_ars']==round(quote*.1)
+              assert api(path+'/location',token=passenger)['position'] is None
+              api(path+'/cash','POST',{'confirm':True},driver)
+              assert api(path+'/cash','POST',{'confirm':True},passenger)['payment']['status']=='confirmed'
+              api(path+'/cash','POST',{'confirm':True},passenger)
+              ledger=api('/api/driver/ledger',token=driver)
+              assert len(ledger['entries'])==1 and ledger['commission_due_ars']==round(quote*.1)
+              api(path+'/rating','POST',{'stars':5},passenger)
+              for token in (passenger,driver):
+                  assert any(r['id']==rid and r['status']=='completed' for r in api('/api/rides/mine',token=token)['rides'])
+                  api('/api/auth/logout','POST',{},token);api('/api/me',token=token,expected=401)
+              passed('Cierre, borrado GPS, confirmación ficticia en efectivo, comisión 10% única, historial y cierre de sesión')
+          finally:
+              errors=[]
+              if deployed:
+                  try: cf('/workers/scripts/'+name+'?force=true','DELETE')
+                  except Exception as e: errors.append(str(e))
+              if dbid:
+                  try: cf('/d1/database/'+dbid,'DELETE')
+                  except Exception as e: errors.append(str(e))
+              if errors: raise RuntimeError('No se pudo limpiar infraestructura temporal: '+str(errors))
+              public_check()
+              print('Infraestructura temporal eliminada; piloto público continúa sin viajes ni pagos.')
+          with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as f:
+              f.write('## Viaje ficticio Cloudflare — aprobado\n\n'+'\n'.join('- '+c for c in checks)+'\n\nSin correo real, GPS físico ni cobros; Worker y D1 temporales eliminados.\n')
+          PY
