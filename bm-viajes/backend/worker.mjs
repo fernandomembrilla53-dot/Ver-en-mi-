@@ -1,3 +1,4 @@
+import {receivePayment} from "./mp-receive.mjs";
 import {createRideCheckout} from "./mp-checkout.mjs";
 import {sandboxReady,beginOAuth,finishOAuth} from "./mp-oauth.mjs";
 import { estimateUrbanFare, TARIFF } from "./tariff.mjs";
@@ -292,6 +293,7 @@ async function main(req,env){
    catch(e){if(e instanceof RangeError)throw new ApiError("Modalidad o espera no admitida.",400);throw e;}
  }
  if(!env?.DB)throw new ApiError("Base de datos no configurada.",503);
+ if(method==="POST"&&path==="/api/mp/webhook"){const status=await receivePayment(env,req);return json({ok:status===200},status);}
  if(method==="GET"&&path==="/api/health"){
    // Comprobar conectividad y presencia de tablas sin leer datos personales.
    try{
