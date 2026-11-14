@@ -107,6 +107,25 @@ jobs:
               print('::add-mask::'+value)
               subprocess.run(['../../node_modules/.bin/wrangler','secret','put',name,'--config','wrangler.json'],input=value+'\n',text=True,check=True)
           PY
+      - name: Configurar Gmail de BM Viajes si existen credenciales propias
+        working-directory: bm-viajes/backend
+        env:
+          GMAIL_CLIENT_ID: ${{ secrets.BM_VIAJES_GMAIL_CLIENT_ID }}
+          GMAIL_CLIENT_SECRET: ${{ secrets.BM_VIAJES_GMAIL_CLIENT_SECRET }}
+          GMAIL_REFRESH_TOKEN: ${{ secrets.BM_VIAJES_GMAIL_REFRESH_TOKEN }}
+          GMAIL_SENDER_EMAIL: ${{ secrets.BM_VIAJES_GMAIL_SENDER_EMAIL }}
+        run: |
+          python3 - <<'PY'
+          import os,subprocess
+          names=['GMAIL_CLIENT_ID','GMAIL_CLIENT_SECRET','GMAIL_REFRESH_TOKEN','GMAIL_SENDER_EMAIL']
+          if not all(os.environ.get(n) for n in names):
+              print('Gmail pendiente: faltan credenciales independientes en GitHub. No se modifican secretos existentes.')
+          else:
+              for n in names:
+                  subprocess.run(['../../node_modules/.bin/wrangler','secret','put',n,'--config','wrangler.json'],input=os.environ[n]+'\n',text=True,check=True)
+              subprocess.run(['../../node_modules/.bin/wrangler','secret','put','EMAIL_PROVIDER','--config','wrangler.json'],input='gmail\n',text=True,check=True)
+              print('Gmail configurado exclusivamente para BM Viajes.')
+          PY
       - name: Verificar API, D1, CORS y bloqueos
         run: |
           python3 - <<'PY'

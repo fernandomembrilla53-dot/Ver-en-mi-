@@ -1,3 +1,4 @@
+import {gmailReady,sendGmailCode} from "./gmail.mjs";
 import {maps} from "./maps.mjs";
 import {operations} from "./operations.mjs";
 import {receivePayment} from "./mp-receive.mjs";
@@ -84,6 +85,12 @@ async function revokeSession(req,env){
  return json({ok:true,message:"Sesión revocada."});
 }
 async function sendEmailCode(env,email,code){
+ if(env.EMAIL_PROVIDER==="gmail"){
+   if(!gmailReady(env))throw new ApiError("Correo Gmail no configurado en el servidor.",503);
+   try{await sendGmailCode(env,email,code);}catch{throw new ApiError("No se pudo enviar el código por Gmail. Revisá la configuración de correo.",503);}
+   return;
+ }
+ if(env.EMAIL_PROVIDER&&env.EMAIL_PROVIDER!=="brevo")throw new ApiError("Proveedor de correo no configurado.",503);
  if(!env.BREVO_API_KEY||!env.MAIL_FROM)throw new ApiError("Correo no configurado en el servidor.",503);
  const request={sender:{name:"BM Viajes",email:env.MAIL_FROM},to:[{email}],subject:"Tu código de acceso a BM Viajes",htmlContent:"<p>Tu código de acceso es:</p><p style=\"font-size:26px;font-weight:bold\">"+code+"</p><p>Caduca en 10 minutos. Si no lo solicitaste, ignorá este mensaje.</p>",textContent:"Tu código de BM Viajes es "+code+". Caduca en 10 minutos."};
  let response;
@@ -314,7 +321,7 @@ async function main(req,env){
      const ready=await env.DB.prepare("SELECT COUNT(*) AS ready_tables FROM sqlite_master WHERE type='table' AND name IN ('users','otp_challenges','sessions','rate_limits','rides','ride_positions','ride_fares','ride_waits','ride_totals','cash_confirmations','driver_ledger','ride_payment_methods','commission_settlements','mp_oauth_states','mp_driver_accounts','mp_checkout_intents','mp_verified_payments','mp_payment_reversals','admin_users','blocked_users','driver_profiles','driver_documents','driver_availability','ride_ratings','incidents','admin_audit','tariff_proposals','ride_declines','map_requests','map_cache')").first();
      if(ready?.ready_tables!==30)throw new Error("Schema incomplete");
    }catch(e){throw new ApiError("Base de datos no disponible o esquema incompleto.",503);}
-   return json({ok:true,service:"BM Viajes",mode:env.ENABLE_LIVE_RIDES==="true"?"pilot":"demo",database:"ready"});
+   return json({ok:true,service:"BM Viajes",mode:env.ENABLE_LIVE_RIDES==="true"?"pilot":"demo",database:"ready",email_provider:env.EMAIL_PROVIDER||"brevo",email_configured:env.EMAIL_PROVIDER==="gmail"?gmailReady(env):(!env.EMAIL_PROVIDER||env.EMAIL_PROVIDER==="brevo")&&!!(env.BREVO_API_KEY&&env.MAIL_FROM)});
  }
  if(method==="GET"&&path==="/api/config")return json({ok:true,live_rides_enabled:env.ENABLE_LIVE_RIDES==="true",payments_enabled:false,area:"Ayacucho",fare_calculation:"pending_municipal_tariffs"});
  // La revocación debe seguir disponible incluso con el límite general de POST agotado.

@@ -218,7 +218,7 @@
           !Number.isFinite(c.longitude)||Math.abs(c.longitude)>180||
           !Number.isFinite(c.accuracy)||c.accuracy<0)return;
         share.busy=true;share.lastSent=now;
-        try{await api("/api/rides/"+rideId+"/location","POST",{position:{lat:c.latitude,lng:c.longitude},accuracy_m:c.accuracy});}
+        try{await api("/api/rides/"+rideId+"/location","POST",{position:{lat:c.latitude,lng:c.longitude},accuracy_m:c.accuracy,sampled_at:p.timestamp});}
         catch(e){if(current()){stopGpsShare();alertText("GPS detenido: "+e.message,true);}}
         finally{share.busy=false;}
       },()=>{if(gpsShare===share){stopGpsShare();alertText("GPS detenido: permiso o ubicación no disponible.",true);}},
