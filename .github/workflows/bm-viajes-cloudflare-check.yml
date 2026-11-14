@@ -1,0 +1,35 @@
+name: BM Viajes - Cloudflare access check
+on:
+  push:
+    branches: [bm-viajes-fare-snapshot]
+    paths: ['.github/workflows/bm-viajes-cloudflare-check.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify configured credentials without revealing values
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || vars.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "$CF_TOKEN" ]; then echo "::error::CLOUDFLARE_API_TOKEN not available in repository Actions"; exit 1; fi
+          if [ -z "$CF_ACCOUNT" ]; then echo "::error::CLOUDFLARE_ACCOUNT_ID not available"; exit 1; fi
+          base=https://api.cloudflare.com/client/v4
+          check() {
+            local endpoint="$1" label="$2" tmp
+            tmp=$(mktemp)
+            if ! curl --silent --show-error --fail --max-time 20 -H "Authorization: Bearer $CF_TOKEN" "$base/$endpoint" -o "$tmp"; then
+              rm -f "$tmp"; echo "::error::$label unavailable"; return 1
+            fi
+            if ! jq -e '.success == true' "$tmp" >/dev/null; then rm -f "$tmp"; echo "::error::$label denied"; return 1; fi
+            rm -f "$tmp"; echo "$label: OK"
+          }
+          check "accounts/$CF_ACCOUNT/d1/database?name=bm-viajes-db" "D1 read access"
+          check "accounts/$CF_ACCOUNT/workers/scripts" "Workers read access"
+          echo "Read-only check complete. Write permissions not verified. No resources changed."
