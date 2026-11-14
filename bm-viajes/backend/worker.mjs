@@ -1,3 +1,4 @@
+import {createRideCheckout} from "./mp-checkout.mjs";
 import {sandboxReady,beginOAuth,finishOAuth} from "./mp-oauth.mjs";
 import { estimateUrbanFare, TARIFF } from "./tariff.mjs";
 // BM Viajes - API piloto Cloudflare Workers + D1.
@@ -331,10 +332,14 @@ async function main(req,env){
  if(method==="GET"&&path==="/api/rides/mine")return myRides(env,user);
  if(method==="GET"&&path==="/api/rides/open")return openRides(env,user);
  if(method==="POST"&&path==="/api/rides")return newRide(req,env,user);
- const match=path.match(/^\/api\/rides\/([0-9a-f-]{36})(?:\/(accept|status|location|wait|cash))?$/);
+ const match=path.match(/^\/api\/rides\/([0-9a-f-]{36})(?:\/(accept|status|location|wait|cash|checkout))?$/);
  if(match){
    const id=match[1],sub=match[2]||"";
    if(method==="GET"&&sub===""){const ride=visibleRide(await rideAccess(env,user,id));return json({ok:true,ride,financials:await rideFinancials(env,id)});}
+   if(method==="POST"&&sub==="checkout"){
+     if(!sandboxReady(env))throw new ApiError("Checkout de prueba no configurado.",503);
+     try{return json({ok:true,...await createRideCheckout(env,user,id)});}catch{throw new ApiError("Checkout no disponible o pendiente de conciliación.",409);}
+   }
    if(method==="POST"&&sub==="cash")return confirmCash(req,env,user,id);
    if(method==="GET"&&sub==="cash"){await rideAccess(env,user,id);return json({ok:true,payment:await cashStatus(env,id)});}
    if(method==="POST"&&sub==="wait")return rideWait(req,env,user,id);
