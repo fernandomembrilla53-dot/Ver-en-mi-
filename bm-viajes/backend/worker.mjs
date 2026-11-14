@@ -297,8 +297,8 @@ async function main(req,env){
  if(method==="GET"&&path==="/api/health"){
    // Comprobar conectividad y presencia de tablas sin leer datos personales.
    try{
-     const ready=await env.DB.prepare("SELECT COUNT(*) AS ready_tables FROM sqlite_master WHERE type='table' AND name IN ('users','otp_challenges','sessions','rate_limits','rides','ride_positions')").first();
-     if(ready?.ready_tables!==6)throw new Error("Schema incomplete");
+     const ready=await env.DB.prepare("SELECT COUNT(*) AS ready_tables FROM sqlite_master WHERE type='table' AND name IN ('users','otp_challenges','sessions','rate_limits','rides','ride_positions','ride_fares','ride_waits','ride_totals','cash_confirmations','driver_ledger','ride_payment_methods','commission_settlements','mp_oauth_states','mp_driver_accounts','mp_checkout_intents','mp_verified_payments','mp_payment_reversals')").first();
+     if(ready?.ready_tables!==18)throw new Error("Schema incomplete");
    }catch(e){throw new ApiError("Base de datos no disponible o esquema incompleto.",503);}
    return json({ok:true,service:"BM Viajes",mode:env.ENABLE_LIVE_RIDES==="true"?"pilot":"demo",database:"ready"});
  }
