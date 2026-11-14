@@ -1,3 +1,4 @@
+import {sandboxReady,beginOAuth,finishOAuth} from "./mp-oauth.mjs";
 import { estimateUrbanFare, TARIFF } from "./tariff.mjs";
 // BM Viajes - API piloto Cloudflare Workers + D1.
 // Falla cerrado: sin ENABLE_LIVE_RIDES=true no acepta viajes reales.
@@ -311,7 +312,19 @@ async function main(req,env){
  }
  if(method==="POST"&&path==="/api/auth/start")return startAuth(req,env);
  if(method==="POST"&&path==="/api/auth/verify")return verifyAuth(req,env);
+ if(method==="GET"&&path==="/api/mp/oauth/callback"){
+   if(!sandboxReady(env))throw new ApiError("Mercado Pago de prueba no configurado.",503);
+   try{return json({ok:true,...await finishOAuth(env,url.searchParams.get("state"),url.searchParams.get("code"))});}catch{throw new ApiError("No se pudo vincular la cuenta. Reiniciá la autorización.",400);}
+ }
  const user=await authenticate(req,env);
+ if(method==="POST"&&path==="/api/driver/mp/oauth"){
+   driverOnly(user);if(!sandboxReady(env))throw new ApiError("Mercado Pago de prueba no configurado.",503);
+   return json({ok:true,authorization_url:await beginOAuth(env,user)});
+ }
+ if(method==="GET"&&path==="/api/driver/mp/account"){
+   const account=await env.DB.prepare("SELECT expires_at FROM mp_driver_accounts WHERE driver_id=?").bind(user.id).first();
+   return json({ok:true,connected:!!account&&account.expires_at>Date.now()});
+ }
  if(method==="GET"&&path==="/api/me")return json({ok:true,user});
  if(method==="POST"&&path==="/api/driver/apply")return applyDriver(req,env,user);
  if(method==="GET"&&path==="/api/driver/ledger")return driverLedger(env,user);
