@@ -1,11 +1,15 @@
 import { DatabaseSync } from 'node:sqlite';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 
 // Execute the production SQL, including constraints and transactions. No SQL mocks.
 // This adapter covers the D1 interface used by worker.mjs, not Cloudflare's runtime.
 export function localD1() {
   const sqlite = new DatabaseSync(':memory:');
   sqlite.exec(readFileSync(new URL('../../backend/schema.sql', import.meta.url), 'utf8'));
+  const migrations = new URL('../../backend/migrations/', import.meta.url);
+  for (const name of readdirSync(migrations).filter(name => /^\d+_.*\.sql$/.test(name)).sort()) {
+    sqlite.exec(readFileSync(new URL(name, migrations), 'utf8'));
+  }
   class Statement {
     constructor(sql, args = []) { this.sql = sql; this.args = args; }
     bind(...args) { return new Statement(this.sql, args); }
