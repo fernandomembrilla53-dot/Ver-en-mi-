@@ -2,6 +2,8 @@ import {gmailReady,sendGmailCode} from "./gmail.mjs";
 import {maps} from "./maps.mjs";
 import {operations} from "./operations.mjs";
 import {receivePayment} from "./mp-receive.mjs";
+import {commissionCheckoutReady,createCommissionCheckout} from "./mp-commission-checkout.mjs";
+import {receiveCommission} from "./mp-commission-receive.mjs";
 import {reconcilePending} from "./mp-reconcile.mjs";
 import {createRideCheckout} from "./mp-checkout.mjs";
 import {sandboxReady,beginOAuth,finishOAuth} from "./mp-oauth.mjs";
@@ -245,7 +247,7 @@ async function driverLedger(env,user){
  const balance=await env.DB.prepare("SELECT (SELECT COALESCE(SUM(amount_ars),0) FROM driver_ledger WHERE driver_id=?) - (SELECT COALESCE(SUM(amount_ars),0) FROM commission_settlements WHERE driver_id=?) AS commission_due_ars").bind(user.id,user.id).first();
  const entries=await env.DB.prepare("SELECT id,ride_id,kind,amount_ars,created_at FROM driver_ledger WHERE driver_id=? ORDER BY created_at DESC,id DESC LIMIT 100").bind(user.id).all();
  const credits=await env.DB.prepare("SELECT id,amount_ars,verified_at FROM commission_settlements WHERE driver_id=? ORDER BY verified_at DESC,id DESC LIMIT 100").bind(user.id).all();
- return json({ok:true,currency:"ARS",commission_due_ars:balance.commission_due_ars,entries:entries.results||[],settlements:credits.results||[],settlements_enabled:false});
+ return json({ok:true,currency:"ARS",commission_due_ars:balance.commission_due_ars,entries:entries.results||[],settlements:credits.results||[],settlements_enabled:commissionCheckoutReady(env)&&user.driver_status==="approved"});
 }
 async function rideStatus(req,env,user,id){
  liveOnly(env);
@@ -315,6 +317,7 @@ async function main(req,env){
    catch(e){if(e instanceof RangeError)throw new ApiError("Modalidad o espera no admitida.",400);throw e;}
  }
  if(!env?.DB)throw new ApiError("Base de datos no configurada.",503);
+ if(method==="POST"&&path==="/api/mp/commission/webhook"){const status=await receiveCommission(env,req);return json({ok:status===200},status);}
  if(method==="POST"&&path==="/api/mp/webhook"){const status=await receivePayment(env,req);return json({ok:status===200},status);}
  if(method==="GET"&&path==="/api/health"){
    // Comprobar conectividad y presencia de tablas sin leer datos personales.
@@ -359,6 +362,11 @@ async function main(req,env){
  }
  if(method==="GET"&&path==="/api/me")return json({ok:true,user});
  if(method==="POST"&&path==="/api/driver/apply")return applyDriver(req,env,user);
+ if(method==="POST"&&path==="/api/driver/commissions/checkout"){
+   driverOnly(user);
+   if(!commissionCheckoutReady(env))throw new ApiError("Liquidaciones de prueba no configuradas.",503);
+   try{return json({ok:true,...await createCommissionCheckout(env,user)});}catch{throw new ApiError("Liquidación no disponible o pendiente de conciliación.",409);}
+ }
  if(method==="GET"&&path==="/api/driver/ledger")return driverLedger(env,user);
  if(method==="GET"&&path==="/api/rides/mine")return myRides(env,user);
  if(method==="GET"&&path==="/api/rides/open")return openRides(env,user);
