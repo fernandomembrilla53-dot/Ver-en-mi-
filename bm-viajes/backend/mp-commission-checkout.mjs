@@ -13,7 +13,7 @@ export async function createCommissionCheckout(env,user,fetcher=fetch){
  const notification=new URL(env.MP_COMMISSION_WEBHOOK_URL);
  if(notification.protocol!=='https:'||notification.username||notification.password)throw Error('Invalid webhook URL');
  notification.searchParams.set('settlement',id);
- const balance=await db.prepare("SELECT (SELECT COALESCE(SUM(amount_ars),0) FROM driver_ledger WHERE driver_id=?) - (SELECT COALESCE(SUM(amount_ars),0) FROM commission_settlements WHERE driver_id=?) AS due").bind(user.id,user.id).first();
+ const balance=await db.prepare("SELECT (SELECT COALESCE(SUM(amount_ars),0) FROM driver_ledger WHERE driver_id=?) - (SELECT COALESCE(SUM(amount_ars),0) FROM commission_settlements WHERE driver_id=?) + (SELECT COALESCE(SUM(v.amount_ars),0) FROM commission_payment_reversals v JOIN commission_settlements s ON s.id=v.settlement_id WHERE s.driver_id=?) AS due").bind(user.id,user.id,user.id).first();
  const amount=balance?.due;
  if(!Number.isSafeInteger(amount)||amount<=0)throw Error('No outstanding commission');
  const reserved=await db.prepare("INSERT INTO commission_checkout_intents(id,driver_id,amount_ars,collector_id,external_reference,status,created_at) VALUES(?,?,?,?,?,'creating',?) ON CONFLICT DO NOTHING").bind(id,user.id,amount,env.MP_COMMISSION_COLLECTOR_ID,reference,Date.now()).run();
