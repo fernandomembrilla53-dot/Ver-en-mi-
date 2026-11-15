@@ -1,0 +1,25 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {localD1} from './helpers/local-d1.mjs';
+import {beginOAuth,finishOAuth} from '../backend/mp-oauth.mjs';
+import {unseal} from '../backend/mp-vault.mjs';
+test('sandbox OAuth exchanges once, stores encrypted credentials, rejects replay',async t=>{
+ const DB=localD1();t.after(()=>DB.close());
+ const id='driver-test';await DB.prepare("INSERT INTO users(id,email,driver_status,created_at) VALUES(?,?,'approved',?)").bind(id,'driver@example.invalid',Date.now()).run();
+ const env={DB,MP_SANDBOX_ENABLED:'true',ENABLE_LIVE_RIDES:'false',MP_CLIENT_ID:'test',MP_CLIENT_SECRET:'fake',MP_REDIRECT_URI:'https://example.invalid/callback',MP_VAULT_KEY:Buffer.alloc(32,7).toString('base64url')};
+ const user={id,driver_status:'approved'};
+ const url=new URL(await beginOAuth(env,user)),state=url.searchParams.get('state');
+ let calls=0;
+ const fake=async(url,opts)=>{calls++;assert.equal(url,'https://api.mercadopago.com/oauth/token');const body=JSON.parse(opts.body);assert.equal(body.code,'fake-code');assert.equal(body.code_verifier.length,43);return Response.json({live_mode:false,access_token:'fake-access',refresh_token:'fake-refresh',user_id:123,expires_in:3600});};
+ assert.deepEqual(await finishOAuth(env,state,'fake-code',fake),{connected:true});
+ const row=await DB.prepare('SELECT * FROM mp_driver_accounts WHERE driver_id=?').bind(id).first();
+ assert.equal(row.seller_id,'123');assert.ok(!row.token_cipher.includes('fake-access'));
+ assert.equal((await unseal(env.MP_VAULT_KEY,id,row.token_cipher)).access_token,'fake-access');
+ await assert.rejects(unseal(env.MP_VAULT_KEY,'other',row.token_cipher));
+ await assert.rejects(finishOAuth(env,state,'fake-code',fake));assert.equal(calls,1);
+ await assert.rejects(beginOAuth({...env,ENABLE_LIVE_RIDES:'true'},user));
+ await assert.rejects(beginOAuth(env,{...user,driver_status:'pending'}));
+ const second=new URL(await beginOAuth(env,user)).searchParams.get('state');
+ await assert.rejects(finishOAuth(env,second,'fake-code',async()=>Response.json({live_mode:true,access_token:'real',refresh_token:'real',user_id:123,expires_in:3600})));
+ assert.equal((await DB.prepare('SELECT token_cipher FROM mp_driver_accounts WHERE driver_id=?').bind(id).first()).token_cipher,row.token_cipher);
+});

@@ -8,6 +8,13 @@
   let user=null,live=false,map=null,pick=null,markers={},line=null,coords={origin:null,destination:null},myRides=[],tab="passenger";
   let pickupGeneration=0,authGeneration=0;
   let refreshTimer=null,sessionEpoch=0,refreshGeneration=0,requestPending=false,acceptPending=new Set();
+  let available=false,availabilityTimer=null;
+  async function availabilityBeat(){
+    if(!available||!user||document.hidden)return;
+    const epoch=sessionEpoch;
+    navigator.geolocation.getCurrentPosition(async p=>{if(epoch!==sessionEpoch||!available||!user)return;try{await api("/api/driver/availability","POST",{available:true,lat:p.coords.latitude,lng:p.coords.longitude,accuracy_m:p.coords.accuracy,sampled_at:p.timestamp});$("availability-state").textContent="Disponible · ubicación actualizada";}catch(e){available=false;clearInterval(availabilityTimer);$("availability-state").textContent=e.message;$("availability").textContent="Ponerme disponible";}},()=>{$("availability-state").textContent="GPS no disponible; la disponibilidad caduca automáticamente.";},{enableHighAccuracy:true,maximumAge:0,timeout:12000});
+  }
+  $("availability").onclick=async()=>{if(!user||!live||user.driver_status!=="approved"){alertText("Disponibilidad bloqueada: requiere piloto habilitado y revisión aprobada.",true);return;}if(!navigator.geolocation){alertText("GPS no disponible.",true);return;}available=!available;$("availability").textContent=available?"Desconectarme":"Ponerme disponible";clearInterval(availabilityTimer);if(available){availabilityBeat();availabilityTimer=setInterval(availabilityBeat,30000);}else{try{await api("/api/driver/availability","POST",{available:false});$("availability-state").textContent="Desconectado";}catch(e){alertText(e.message,true);}}};
   function alertText(message,bad=false){
     const el=$("pilot-alert");el.hidden=false;el.textContent=message;el.className="status"+(bad?" error":" success");
   }
@@ -28,54 +35,19 @@
     }finally{clearTimeout(timeout);}
   }
 
-  // Independent simulation; no fare is attached to a ride until server snapshots exist.
-  function fareQuery(kind,night,minutes){
-    if(!["one_way","round_trip"].includes(kind)||typeof night!=="boolean"||
-      !Number.isInteger(minutes)||minutes<0||minutes>1440||
-      (kind==="one_way"&&minutes!==0)||(kind==="round_trip"&&night))throw Error("Modalidad o espera no admitida.");
-    return "/api/fare/estimate?kind="+kind+"&night="+night+"&waitSeconds="+minutes*60;
-  }
   function installFarePreview(){
     const host=document.createElement("div");host.className="panel";
-    const heading=document.createElement("h3");heading.textContent="Simulador de tarifa urbana";
-    const note=document.createElement("p");note.className="muted";note.textContent="Propuesta no oficial. No reserva un viaje ni fija su precio. La espera es estimada.";
-    const label=document.createElement("label");label.htmlFor="fare-kind";label.textContent="Modalidad";
-    const select=document.createElement("select");select.id="fare-kind";select.style.cssText="width:100%;min-height:44px;font:inherit";
-    for(const [value,name] of [["one_way","Solo ida"],["round_trip","Ida y vuelta"],["night","Solo ida nocturna"]]){
-      const option=document.createElement("option");option.value=value;option.textContent=name;select.append(option);
-    }
-    const waitLabel=document.createElement("label");waitLabel.htmlFor="fare-wait";waitLabel.textContent="Espera estimada (minutos)";
-    const wait=document.createElement("input");wait.id="fare-wait";wait.type="number";wait.min="0";wait.max="1440";wait.step="1";wait.value="0";wait.disabled=true;
-    const button=document.createElement("button");button.type="button";button.className="btn secondary";button.textContent="Consultar estimación";button.style.marginTop="10px";
-    const output=document.createElement("p");output.className="status";output.setAttribute("role","status");
-    let generation=0;
-    function reset(){generation++;wait.disabled=select.value!=="round_trip";if(wait.disabled)wait.value="0";output.textContent="Consultá el precio estimado.";button.disabled=false;}
-    select.addEventListener("change",reset);wait.addEventListener("input",reset);
-    button.addEventListener("click",async()=>{
-      const epoch=sessionEpoch,request=++generation;
-      const current=()=>epoch===sessionEpoch&&request===generation&&!!user;
-      button.disabled=true;output.textContent="Consultando servidor...";
-      try{
-        const kind=select.value==="round_trip"?"round_trip":"one_way";
-        if(!wait.disabled&&(!wait.value.trim()||!wait.checkValidity()))throw Error("Ingresá minutos enteros entre 0 y 1440.");
-        const data=await api(fareQuery(kind,select.value==="night",Number(wait.value)));
-        if(!current())return;
-        const e=data.estimate;
-        if(e?.simulationOnly!==true||e.currency!=="ARS"||!Number.isSafeInteger(e.total)||e.total<0)throw Error("Estimación inválida.");
-        const money=new Intl.NumberFormat("es-AR",{style:"currency",currency:"ARS",maximumFractionDigits:0});
-        output.textContent="Estimación: "+money.format(e.total)+". No incluye cobro ni reserva.";
-      }catch(e){if(current())output.textContent="No se pudo cotizar: "+e.message;}
-      finally{if(current())button.disabled=false;}
-    });
-    host.append(heading,note,label,select,waitLabel,wait,button,output);
-    $("request-ride").before(host);reset();
-    return ()=>{select.value="one_way";reset();};
+    host.innerHTML='<h3>Modalidad y pago</h3><label for="ride-kind">Viaje urbano</label><select id="ride-kind"><option value="one_way">Directo</option><option value="round_trip">Ida y vuelta</option></select><label for="payment-method">Método de pago</label><select id="payment-method"><option value="cash">Efectivo</option><option value="mercadopago" disabled>Mercado Pago — pendiente de pruebas</option></select><p>Ida y vuelta: 5 minutos de espera gratis; luego $250 por minuto iniciado. Rural e ida y vuelta nocturna pendientes de tarifa.</p><button type="button" id="quote-now" class="btn secondary">Ver tarifa actual</button><p id="quote-result" role="status"></p>';
+    $("request-ride").before(host);
+    $("quote-now").onclick=async()=>{try{const r=await api("/api/fare/current?kind="+$("ride-kind").value);$("quote-result").textContent="Tarifa base: $"+r.estimate.base.toLocaleString("es-AR")+" ARS. Espera adicional calculada por el servidor.";}catch(e){$("quote-result").textContent=e.message;}};
+    return ()=>{$("ride-kind").value="one_way";$("payment-method").value="cash";$("quote-result").textContent="";};
   }
   const resetFarePreview=installFarePreview();
 
   function setUser(next){
     resetFarePreview();
     sessionEpoch++;
+    available=false;clearInterval(availabilityTimer);$("availability").textContent="Ponerme disponible";
     stopGpsShare();
     stopPassengerTracking();
     requestPending=false;acceptPending=new Set();
@@ -116,6 +88,15 @@
     $("set-pickup").setAttribute("aria-pressed",String(pick==="origin"));
     $("set-dropoff").setAttribute("aria-pressed",String(pick==="destination"));
   }
+  $("search-address").onclick=async()=>{
+    const epoch=sessionEpoch,generation=pickupGeneration;$("search-address").disabled=true;
+    try{const r=await api("/api/maps/search?q="+encodeURIComponent($("address-search").value));if(epoch!==sessionEpoch||generation!==pickupGeneration||!user)return;$("address-results").replaceChildren();for(const p of r.places){const b=document.createElement("button");b.className="btn secondary";b.textContent=p.label;b.onclick=()=>{setPoint($("address-target").value,{lat:p.lat,lng:p.lng});$("address-results").replaceChildren();};$("address-results").append(b);}if(!r.places.length)alertText("Sin resultados. Podés marcar el punto en el mapa.");}catch(e){alertText(e.message,true);}finally{$("search-address").disabled=false;}
+  };
+  $("street-route").onclick=async()=>{
+    if(!coords.origin||!coords.destination){alertText("Elegí origen y destino.",true);return;}
+    const epoch=sessionEpoch,generation=pickupGeneration,a=coords.origin,b=coords.destination;$("street-route").disabled=true;
+    try{const r=await api(`/api/maps/route?alat=${a.lat}&alng=${a.lng}&blat=${b.lat}&blng=${b.lng}`);if(epoch!==sessionEpoch||generation!==pickupGeneration||!user)return;if(line)map.removeLayer(line);line=L.polyline(r.route.geometry.coordinates.map(c=>[c[1],c[0]]),{color:"#187966",weight:5}).addTo(map);map.fitBounds(line.getBounds(),{padding:[20,20]});$("pickup-status").textContent=(r.route.distance/1000).toFixed(1)+" km por calles · "+Math.ceil(r.route.duration/60)+" minutos estimados. Confirmá los puntos y el sentido de circulación.";}catch(e){alertText(e.message,true);}finally{$("street-route").disabled=false;}
+  };
   function setPoint(key,p){
     const x=pos(p);if(!Number.isFinite(x.lat)||!Number.isFinite(x.lng)||Math.abs(x.lat)>90||Math.abs(x.lng)>180)return;
     // A manual map selection must invalidate any pending GPS callback.
@@ -237,7 +218,7 @@
           !Number.isFinite(c.longitude)||Math.abs(c.longitude)>180||
           !Number.isFinite(c.accuracy)||c.accuracy<0)return;
         share.busy=true;share.lastSent=now;
-        try{await api("/api/rides/"+rideId+"/location","POST",{position:{lat:c.latitude,lng:c.longitude},accuracy_m:c.accuracy});}
+        try{await api("/api/rides/"+rideId+"/location","POST",{position:{lat:c.latitude,lng:c.longitude},accuracy_m:c.accuracy,sampled_at:p.timestamp});}
         catch(e){if(current()){stopGpsShare();alertText("GPS detenido: "+e.message,true);}}
         finally{share.busy=false;}
       },()=>{if(gpsShare===share){stopGpsShare();alertText("GPS detenido: permiso o ubicación no disponible.",true);}},
@@ -252,17 +233,28 @@
     const strong=document.createElement("strong");strong.textContent="Viaje "+ride.id.slice(0,8)+" · "+ride.status;
     const detail=document.createElement("small");detail.textContent=new Date(ride.created_at).toLocaleString("es-AR");
     card.append(strong,detail);
+    const receipt=document.createElement("p");card.append(receipt);
+    const epoch=sessionEpoch;
+    api("/api/rides/"+ride.id).then(r=>{if(epoch!==sessionEpoch||!user)return;const f=r.financials;if(f)receipt.textContent="Tarifa: $"+(f.total_ars??f.base_ars)+" ARS · "+(f.kind==="round_trip"?"Ida y vuelta":"Directo")+(f.started_at&&!f.ended_at?" · Espera en curso desde "+new Date(f.started_at).toLocaleTimeString("es-AR"):"");}).catch(()=>{});
+    if(ride.driver_id&&!asDriver)api("/api/rides/"+ride.id+"/driver").then(r=>{if(epoch!==sessionEpoch||!user||!r.driver)return;const p=document.createElement("p");p.textContent=r.driver.display_name+" · "+r.driver.vehicle+" · "+r.driver.plate;card.append(p);}).catch(()=>{});
     function action(label,next,method){
       const b=document.createElement("button");b.type="button";b.className="btn secondary";b.textContent=label;
       b.addEventListener("click",async()=>{if(!user||b.disabled)return;const epoch=sessionEpoch;const current=()=>epoch===sessionEpoch&&!!user;b.disabled=true;if(asDriver&&next.status==="completed")stopGpsShare();try{await api("/api/rides/"+ride.id+"/"+method,"POST",next);if(!current())return;await refresh();if(current())alertText("Estado actualizado.");}catch(e){if(current())alertText(e.message,true);}finally{b.disabled=false;}});
       card.append(b);
     }
+    if(ride.status==="completed"){
+      action(asDriver?"Confirmar efectivo recibido":"Confirmar efectivo entregado",{confirm:true},"cash");
+      if(!asDriver){const label=document.createElement("label");label.textContent="Calificar al conductor";const select=document.createElement("select");for(let n=1;n<=5;n++){const o=document.createElement("option");o.value=n;o.textContent=n+" / 5";select.append(o);}select.value="5";label.append(select);card.append(label);const rate=document.createElement("button");rate.className="btn secondary";rate.textContent="Guardar calificación";rate.onclick=async()=>{rate.disabled=true;try{await api("/api/rides/"+ride.id+"/rating","POST",{stars:Number(select.value)});alertText("Calificación guardada.");}catch(e){alertText(e.message,true);}finally{rate.disabled=false;}};card.append(rate);}
+    }
     if(asDriver){
+      if(ride.status==="accepted")action("Cancelar asignación",{status:"cancelled"},"status");
       if(ride.status==="accepted")action("Iniciar trayecto",{status:"in_progress"},"status");
       if(ride.status==="in_progress"){
+        action("Iniciar espera (ida y vuelta)",{action:"start"},"wait");
+        action("Detener espera",{action:"stop"},"wait");
         action("Finalizar trayecto",{status:"completed"},"status");
         const gps=document.createElement("button");gps.className="btn secondary";gps.textContent="Enviar posición GPS ahora";
-        gps.addEventListener("click",()=>{if(!navigator.geolocation){alertText("GPS no disponible.",true);return;}const epoch=sessionEpoch,driverId=user?.id;navigator.geolocation.getCurrentPosition(async p=>{if(epoch!==sessionEpoch||!user||user.id!==driverId||!canShareGps(ride.id))return;try{await api("/api/rides/"+ride.id+"/location","POST",{position:{lat:p.coords.latitude,lng:p.coords.longitude},accuracy_m:p.coords.accuracy});if(epoch===sessionEpoch&&user?.id===driverId)alertText("Posición enviada voluntariamente al pasajero asignado.");}catch(e){if(epoch===sessionEpoch&&user?.id===driverId)alertText(e.message,true);}},()=>{if(epoch===sessionEpoch&&user?.id===driverId)alertText("Sin permiso GPS.",true);},{enableHighAccuracy:true,timeout:12000});});
+        gps.addEventListener("click",()=>{if(!navigator.geolocation){alertText("GPS no disponible.",true);return;}const epoch=sessionEpoch,driverId=user?.id;navigator.geolocation.getCurrentPosition(async p=>{if(epoch!==sessionEpoch||!user||user.id!==driverId||!canShareGps(ride.id))return;try{await api("/api/rides/"+ride.id+"/location","POST",{position:{lat:p.coords.latitude,lng:p.coords.longitude},accuracy_m:p.coords.accuracy,sampled_at:p.timestamp});if(epoch===sessionEpoch&&user?.id===driverId)alertText("Posición enviada voluntariamente al pasajero asignado.");}catch(e){if(epoch===sessionEpoch&&user?.id===driverId)alertText(e.message,true);}},()=>{if(epoch===sessionEpoch&&user?.id===driverId)alertText("Sin permiso GPS.",true);},{enableHighAccuracy:true,timeout:12000});});
         card.append(gps);
         const shareButton=document.createElement("button");shareButton.type="button";shareButton.className="btn secondary";shareButton.dataset.gpsShare=ride.id;
         shareButton.addEventListener("click",()=>{if(gpsShare?.rideId===ride.id){stopGpsShare();alertText("GPS compartido detenido. La última posición enviada puede seguir visible brevemente.");}else{startGpsShare(ride.id);if(gpsShare)alertText("GPS compartido con el pasajero asignado mientras esta pantalla esté abierta.");}});
@@ -301,7 +293,7 @@
     show("driver-current",myRides.filter(x=>x.driver_id===user.id).map(x=>rideCard(x,true)),"Todavía no hay viajes asignados.");
     syncGpsButtons();
     syncPassengerTrackingButtons();
-    if(user.driver_status==="approved"&&live){
+    if(user.driver_status==="approved"&&live&&available){
       const open=await api("/api/rides/open");
       if(epoch!==sessionEpoch||generation!==refreshGeneration||!user)return;
       const cards=(open.rides||[]).map(ride=>{
@@ -310,7 +302,8 @@
         const details=document.createElement("small");details.textContent="Aprox. "+ride.distance_air_km+" km en línea recta. No incluye tarifa.";
         const button=document.createElement("button");button.className="btn";button.textContent="Aceptar solicitud";button.disabled=acceptPending.has(ride.id);
         button.addEventListener("click",async()=>{if(!user||!live||button.disabled||acceptPending.has(ride.id))return;const epoch=sessionEpoch;const current=()=>epoch===sessionEpoch&&!!user;const pending=acceptPending;pending.add(ride.id);button.disabled=true;try{await api("/api/rides/"+ride.id+"/accept","POST",{});if(!current())return;await refresh();if(current())alertText("Viaje asignado.");}catch(e){if(current())alertText(e.message,true);}finally{pending.delete(ride.id);if(current())button.disabled=false;}});
-        el.append(name,details,button);return el;
+        const decline=document.createElement("button");decline.className="btn secondary";decline.textContent="Rechazar";decline.onclick=async()=>{try{await api("/api/rides/"+ride.id+"/decline","POST",{});await refresh();}catch(e){alertText(e.message,true);}};
+        el.append(name,details,button,decline);return el;
       });
       show("available-rides",cards,"No hay solicitudes abiertas.");
     }else $("available-rides").textContent="Solo visible con conductor verificado y servicio habilitado.";
@@ -321,7 +314,12 @@
     const epoch=sessionEpoch;
     const current=()=>epoch===sessionEpoch&&!!user;
     requestPending=true;redraw();
-    try{await api("/api/rides","POST",{origin:coords.origin,destination:coords.destination});if(!current())return;await refresh();if(current())alertText("Solicitud enviada al servidor del piloto.");}
+    try{
+      const kind=$("ride-kind").value,payment_method=$("payment-method").value;
+      const quoted=await api("/api/fare/current?kind="+kind);
+      if(!current())return;
+      if(!confirm("Confirmar viaje urbano por $"+quoted.estimate.base.toLocaleString("es-AR")+" ARS, en efectivo."+(kind==="round_trip"?" Espera adicional: $250/minuto iniciado después de 5 minutos.":"")))return;
+      await api("/api/rides","POST",{origin:coords.origin,destination:coords.destination,kind,payment_method,quoted_base_ars:quoted.estimate.base});if(!current())return;await refresh();if(current())alertText("Solicitud enviada al servidor del piloto.");}
     catch(e){if(current())alertText(e.message,true);}finally{if(current()){requestPending=false;redraw();}}
   });
   $("driver-apply").addEventListener("click",async()=>{
