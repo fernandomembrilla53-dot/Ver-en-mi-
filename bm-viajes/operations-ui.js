@@ -9,7 +9,34 @@ $('profile').onsubmit=run(async()=>{await api('/driver/profile',data($('profile'
 async function compact(file){if(!['image/jpeg','image/png'].includes(file.type)||file.size>10*1024*1024)throw Error('Elegí una foto JPG o PNG de hasta 10 MB.');const bitmap=await createImageBitmap(file),canvas=document.createElement('canvas');const scale=Math.min(1,1200/Math.max(bitmap.width,bitmap.height));canvas.width=Math.round(bitmap.width*scale);canvas.height=Math.round(bitmap.height*scale);const ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close();for(let quality=.85;quality>=.25;quality-=.1){const encoded=canvas.toDataURL('image/jpeg',quality).split(',')[1];if(encoded.length<=120000)return encoded;}throw Error('La imagen sigue siendo muy grande. Recortá el documento y volvé a intentar.');}
 $('documents').onsubmit=run(async()=>{const f=$('documents'),photo=f.elements.photo.files[0];const encoded=await compact(photo);await api('/driver/documents',{kind:f.elements.kind.value,expires_at:Date.parse(f.elements.expiry.value+'T23:59:59-03:00'),mime:'image/jpeg',data:encoded});f.reset();await profile();status('Documento cifrado guardado; revisión pendiente.');});
 async function earnings(){const r=await api('/driver/earnings?days='+$('period').value),ledger=await api('/driver/ledger');$('earnings').textContent='Período móvil de '+r.days+' días\n'+JSON.stringify({viajes_confirmados:r.summary.rides,bruto_ARS:r.summary.gross_ars,comisión_ARS:r.summary.commission_ars,neto_antes_costos_ARS:r.summary.net_ars,reversiones_ARS:r.reversals_ars,libro_mayor:ledger},null,2);}
-$('earnings-refresh').onclick=run(earnings);
+const commissionButton=document.createElement('button'),commissionStatus=document.createElement('p');
+commissionButton.type='button';commissionButton.textContent='Pagar comisiones (prueba)';commissionButton.disabled=true;
+commissionStatus.setAttribute('role','status');commissionStatus.textContent='Consultando saldo de comisiones.';
+$('earnings').after(commissionButton,commissionStatus);
+async function refreshCommission(){
+ commissionButton.disabled=true;
+ const ledger=await api('/driver/ledger');
+ const due=ledger.commission_due_ars;
+ if(!Number.isSafeInteger(due))throw Error('Saldo no disponible.');
+ commissionStatus.textContent='Saldo pendiente: '+new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS'}).format(due)+'. '+(ledger.settlements_enabled?'Solo entorno de prueba.':'Pagos no habilitados.');
+ commissionButton.disabled=!(ledger.settlements_enabled&&due>0);
+}
+function safeCommissionUrl(value){
+ const u=new URL(value);
+ if(u.protocol!=='https:'||u.username||u.password||u.port||!['sandbox.mercadopago.com.ar','sandbox.mercadopago.com'].includes(u.hostname))throw Error('Destino de pago inesperado.');
+ return u.href;
+}
+commissionButton.onclick=async()=>{
+ commissionButton.disabled=true;
+ try{
+  const ledger=await api('/driver/ledger');
+  if(!ledger.settlements_enabled||!(ledger.commission_due_ars>0))throw Error('Liquidación no disponible.');
+  const r=await api('/driver/commissions/checkout',{});
+  location.assign(safeCommissionUrl(r.checkout_url));
+ }catch(e){commissionStatus.textContent=e.message;try{await refreshCommission();}catch{}}
+};
+$('earnings-refresh').onclick=run(async()=>{await earnings();await refreshCommission();});
+window.addEventListener('pageshow',()=>{refreshCommission().catch(e=>{commissionStatus.textContent=e.message;});});
 $('mp-connect').onclick=run(async()=>{const r=await api('/driver/mp/oauth',{});const u=new URL(r.authorization_url);if(u.protocol!=='https:'||u.hostname!=='auth.mercadopago.com.ar')throw Error('Destino OAuth inesperado.');location.assign(u.href);});
 async function incidents(){$('incidents').textContent=JSON.stringify((await api('/incidents')).incidents,null,2);}
 $('support').onsubmit=run(async()=>{await api('/incidents',data($('support')));$('support').reset();await incidents();status('Solicitud registrada.');});
