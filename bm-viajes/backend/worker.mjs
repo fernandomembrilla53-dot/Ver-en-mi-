@@ -244,7 +244,7 @@ async function confirmCash(req,env,user,id){
  return json({ok:true,payment:await cashStatus(env,id)});
 }
 async function driverLedger(env,user){
- const balance=await env.DB.prepare("SELECT (SELECT COALESCE(SUM(amount_ars),0) FROM driver_ledger WHERE driver_id=?) - (SELECT COALESCE(SUM(amount_ars),0) FROM commission_settlements WHERE driver_id=?) AS commission_due_ars").bind(user.id,user.id).first();
+ const balance=await env.DB.prepare("SELECT (SELECT COALESCE(SUM(amount_ars),0) FROM driver_ledger WHERE driver_id=?) - (SELECT COALESCE(SUM(amount_ars),0) FROM commission_settlements WHERE driver_id=?) + (SELECT COALESCE(SUM(v.amount_ars),0) FROM commission_payment_reversals v JOIN commission_settlements s ON s.id=v.settlement_id WHERE s.driver_id=?) AS commission_due_ars").bind(user.id,user.id,user.id).first();
  const entries=await env.DB.prepare("SELECT id,ride_id,kind,amount_ars,created_at FROM driver_ledger WHERE driver_id=? ORDER BY created_at DESC,id DESC LIMIT 100").bind(user.id).all();
  const credits=await env.DB.prepare("SELECT id,amount_ars,verified_at FROM commission_settlements WHERE driver_id=? ORDER BY verified_at DESC,id DESC LIMIT 100").bind(user.id).all();
  return json({ok:true,currency:"ARS",commission_due_ars:balance.commission_due_ars,entries:entries.results||[],settlements:credits.results||[],settlements_enabled:commissionCheckoutReady(env)&&user.driver_status==="approved"});
