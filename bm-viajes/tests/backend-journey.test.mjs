@@ -7,7 +7,7 @@ const origin = { lat: -37.1515, lng: -58.4859 };
 const destination = { lat: -37.165, lng: -58.49 };
 const route = { origin, destination };
 
-function fixture(t) {
+function fixture(t, provider) {
   const DB = localD1(), mailbox = new Map(), unexpected = [];
   // Never read process.env, wrangler config, production URLs or credentials.
   const env = { DB, AUTH_SECRET: 'offline-test-secret-not-for-production-0001',
@@ -17,6 +17,7 @@ function fixture(t) {
   // No request is forwarded. Unexpected calls fail AND are recorded, even if
   // the worker catches the error and would otherwise hide it from the test.
   t.mock.method(globalThis, 'fetch', async (url, options) => {
+    if (provider && String(url).startsWith('https://api.mercadopago.com/')) return provider(url, options);
     if (url !== 'https://api.brevo.com/v3/smtp/email' || options?.method !== 'POST') {
       unexpected.push(String(url)); throw new Error('Network disabled in backend tests');
     }
@@ -322,4 +323,61 @@ test('payment selection and verified settlement credits cannot double count', as
   await credit('credit-4','test:4',150);
   assert.equal((await api('GET','/driver/ledger',driver.token)).commission_due_ars,0);
   assert.equal((await api('GET','/driver/ledger',rider.token)).settlements.length,0);
+});
+
+test('commission checkout, signed webhook, reconciliation and reversals through real local ledger', async t => {
+  let payment, preference, calls=0;
+  const f=fixture(t, async (url, options)=>{
+    assert.equal(options.headers.Authorization,'Bearer TEST-offline-commission');
+    if(url==='https://api.mercadopago.com/checkout/preferences'){
+      calls++; preference=JSON.parse(options.body);
+      assert.equal(preference.items[0].unit_price,400);
+      assert.equal(preference.items[0].currency_id,'ARS');
+      return Response.json({id:'offline-preference',sandbox_init_point:'https://sandbox.mercadopago.com.ar/checkout/offline'});
+    }
+    if(url==='https://api.mercadopago.com/v1/payments/123')return Response.json(payment);
+    if(String(url).startsWith('https://api.mercadopago.com/v1/payments/search?'))return Response.json({results:[payment],paging:{total:1}});
+    assert.fail('Unexpected provider request: '+url);
+  });
+  const {api,DB,env}=f, {rider,driver}=await f.participants();
+  const {ride_id:id}=await api('POST','/rides',rider.token,route,201);
+  await api('POST',`/rides/${id}/accept`,driver.token);
+  await api('POST',`/rides/${id}/status`,driver.token,{status:'in_progress'});
+  await api('POST',`/rides/${id}/status`,driver.token,{status:'completed'});
+  await api('POST',`/rides/${id}/cash`,rider.token,{confirm:true});
+  await api('POST',`/rides/${id}/cash`,driver.token,{confirm:true});
+  Object.assign(env,{ENABLE_LIVE_RIDES:'false',MP_COMMISSION_SANDBOX_ENABLED:'true',MP_COMMISSION_ACCESS_TOKEN:'TEST-offline-commission',MP_COMMISSION_COLLECTOR_ID:'456',MP_COMMISSION_WEBHOOK_URL:'https://backend.example.invalid/api/mp/commission/webhook',MP_COMMISSION_WEBHOOK_SECRET:'offline-webhook-secret'});
+  const ledger=()=>api('GET','/driver/ledger',driver.token);
+  assert.equal((await ledger()).commission_due_ars,400);
+  assert.equal((await ledger()).settlements_enabled,true);
+  await api('POST','/driver/commissions/checkout',rider.token,undefined,403);
+  const checkout=await api('POST','/driver/commissions/checkout',driver.token);
+  assert.equal(checkout.checkout_url,'https://sandbox.mercadopago.com.ar/checkout/offline');
+  assert.equal((await api('POST','/driver/commissions/checkout',driver.token)).checkout_url,checkout.checkout_url);
+  assert.equal(calls,1);
+  const intent=await DB.prepare('SELECT * FROM commission_checkout_intents WHERE driver_id=?').bind(driver.user.id).first();
+  assert.equal(intent.external_reference,preference.external_reference);
+  payment={id:123,status:'approved',currency_id:'ARS',transaction_amount:400,transaction_amount_refunded:0,external_reference:intent.external_reference,collector_id:456,live_mode:false};
+  const url=preference.notification_url+'&data.id=123';
+  const ts=String(Math.floor(Date.now()/1000)), requestId='offline-request';
+  const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(env.MP_COMMISSION_WEBHOOK_SECRET),{name:'HMAC',hash:'SHA-256'},false,['sign']);
+  const signature=Buffer.from(await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(`id:123;request-id:${requestId};ts:${ts};`))).toString('hex');
+  const webhook=async (sig=signature)=>worker.fetch(new Request(url,{method:'POST',headers:{'x-signature':`ts=${ts},v1=${sig}`,'x-request-id':requestId}}),env);
+  assert.equal((await webhook('0'.repeat(64))).status,401);
+  assert.equal((await ledger()).commission_due_ars,400);
+  assert.equal((await webhook()).status,200);
+  assert.equal((await webhook()).status,200);
+  assert.equal((await ledger()).commission_due_ars,0);
+  assert.equal((await ledger()).settlements.length,1);
+  payment.transaction_amount_refunded=100;
+  const tasks=[];
+  await worker.scheduled({},env,{waitUntil(p){tasks.push(p);}});
+  await Promise.all(tasks);
+  assert.equal((await ledger()).commission_due_ars,100);
+  payment.status='charged_back'; payment.transaction_amount_refunded=400;
+  assert.equal((await webhook()).status,200);
+  assert.equal((await webhook()).status,200);
+  assert.equal((await ledger()).commission_due_ars,400);
+  assert.equal((await ledger()).settlements.length,1);
+  assert.equal((await DB.prepare('SELECT amount_ars FROM commission_payment_reversals WHERE settlement_id=?').bind(intent.id).first()).amount_ars,400);
 });
