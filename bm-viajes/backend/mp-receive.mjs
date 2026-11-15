@@ -11,6 +11,11 @@ export async function receivePayment(env,req,fetcher=fetch){
  if(!await verifyWebhook({url:req.url,signature:req.headers.get('x-signature'),requestId:req.headers.get('x-request-id'),secret:env.MP_WEBHOOK_SECRET}))return 401;
  const q=new URL(req.url).searchParams,ride=q.get('ride'),payment=q.get('data.id');
  if(q.getAll('ride').length!==1||! /^[0-9a-f-]{36}$/.test(ride??'')||! /^[1-9]\d{0,19}$/.test(payment??''))return 400;
+ return reconcilePayment(env,ride,payment,fetcher);
+}
+// Trusted internal caller; provider data is independently fetched and validated.
+export async function reconcilePayment(env,ride,payment,fetcher=fetch){
+ if(!sandboxReady(env)||! /^[0-9a-f-]{36}$/.test(ride??'')||! /^[1-9]\d{0,19}$/.test(payment??''))return 400;
  const db=env.DB;
  const r=await db.prepare(`SELECT i.ride_id,i.seller_id,i.external_reference,i.status,t.total_ars,r.driver_id,a.token_cipher,a.expires_at FROM mp_checkout_intents i JOIN ride_totals t ON t.ride_id=i.ride_id JOIN rides r ON r.id=i.ride_id JOIN mp_driver_accounts a ON a.driver_id=r.driver_id AND a.seller_id=i.seller_id WHERE i.ride_id=?`).bind(ride).first();
  if(!r)return 503;
@@ -23,9 +28,9 @@ export async function receivePayment(env,req,fetcher=fetch){
  if(String(p.id)!==payment)return 409;
  const prior=await db.prepare('SELECT payment_id,amount_ars FROM mp_verified_payments WHERE ride_id=?').bind(ride).first();
  if(prior){
-   if(prior.payment_id!==payment)return 409;
+   if(prior.payment_id!=='mp:'+payment)return 409;
    let reversal;try{reversal=verifiedReversal(p,{paymentId:payment,reference:r.external_reference,amountArs:prior.amount_ars,collectorId:r.seller_id});}catch{return 409;}
-   await storeReversal(db,payment,ride,reversal);
+   await storeReversal(db,prior.payment_id,ride,reversal);
    return 200;
  }
  if(p.status!=='approved'||p.transaction_amount_refunded!==0)return 202; // unverified reversal requires review
