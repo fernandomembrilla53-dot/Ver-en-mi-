@@ -30,14 +30,19 @@ export async function reconcileCommission(env,id,payment,fetcher=fetch){
   await db.prepare("INSERT INTO commission_payment_reversals(settlement_id,kind,amount_ars,observed_at) VALUES(?,?,?,?) ON CONFLICT(settlement_id) DO UPDATE SET kind=excluded.kind,amount_ars=excluded.amount_ars,observed_at=excluded.observed_at WHERE excluded.amount_ars>=commission_payment_reversals.amount_ars AND (commission_payment_reversals.kind<>'chargeback' OR excluded.kind='chargeback')").bind(id,reversal.kind,reversal.amount,Date.now()).run();
   return 200;
  }
- if(p.status!=='approved'||p.transaction_amount_refunded!==0)return 202;
- let verified;
- try{verified=verifyApprovedPayment(p,{reference:intent.external_reference,amountArs:intent.amount_ars,collectorId:intent.collector_id,liveMode:false});}catch{return 409;}
+ if(!['approved','refunded','charged_back'].includes(p.status))return 202;
+ let verified,reversal;
  try{
- await db.batch([
+  reversal=commissionReversal(p,intent,payment);
+  verified=reversal?{providerReference:'mp:'+payment}:verifyApprovedPayment(p,{reference:intent.external_reference,amountArs:intent.amount_ars,collectorId:intent.collector_id,liveMode:false});
+ }catch{return 409;}
+ try{
+ const statements=[
  db.prepare("INSERT INTO commission_settlements(id,driver_id,provider_reference,amount_ars,verified_at) SELECT id,driver_id,?,amount_ars,? FROM commission_checkout_intents WHERE id=? AND status IN ('creating','ready','review') AND NOT EXISTS(SELECT 1 FROM commission_settlements WHERE id=? OR provider_reference=?)").bind(verified.providerReference,Date.now(),id,id,verified.providerReference),
  db.prepare("UPDATE commission_checkout_intents SET status='paid' WHERE id=? AND EXISTS(SELECT 1 FROM commission_settlements WHERE id=? AND provider_reference=?)").bind(id,id,verified.providerReference)
- ]);
+ ];
+ if(reversal)statements.push(db.prepare("INSERT INTO commission_payment_reversals(settlement_id,kind,amount_ars,observed_at) SELECT id,?,?,? FROM commission_settlements WHERE id=? AND provider_reference=? ON CONFLICT(settlement_id) DO UPDATE SET kind=excluded.kind,amount_ars=excluded.amount_ars,observed_at=excluded.observed_at WHERE excluded.amount_ars>=commission_payment_reversals.amount_ars AND (commission_payment_reversals.kind<>'chargeback' OR excluded.kind='chargeback')").bind(reversal.kind,reversal.amount,Date.now(),id,verified.providerReference));
+ await db.batch(statements);
  }catch{
  await db.prepare("UPDATE commission_checkout_intents SET status='review' WHERE id=? AND status IN ('creating','ready')").bind(id).run();
  return 503;
@@ -72,7 +77,7 @@ export async function reconcileCommissionPending(env,fetcher=fetch,now=Date.now(
     if(!response.ok)throw Error('Search failed');
     const body=await response.json();
     if(!Array.isArray(body.results)||!Number.isSafeInteger(body.paging?.total)||body.paging.total>body.results.length)throw Error('Incomplete search');
-    const matches=body.results.filter(p=>p.external_reference===row.external_reference&&String(p.collector_id)===row.collector_id&&p.live_mode===false&&p.status==='approved');
+    const matches=body.results.filter(p=>p.external_reference===row.external_reference&&String(p.collector_id)===row.collector_id&&p.live_mode===false&&['approved','refunded','charged_back'].includes(p.status));
     if(matches.length!==1)throw Error('No unique approved payment');
     payment=String(matches[0].id);
    }
