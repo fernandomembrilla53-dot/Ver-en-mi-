@@ -2,6 +2,16 @@ import {commissionCheckoutReady} from './mp-commission-checkout.mjs';
 import {verifyApprovedPayment} from './mp-verification.mjs';
 import {verifyWebhook} from './mp-webhook.mjs';
 
+export function commissionReversal(p,intent,payment){
+ if(String(p.id)!==payment||p.currency_id!=='ARS'||p.transaction_amount!==intent.amount_ars||p.external_reference!==intent.external_reference||String(p.collector_id)!==intent.collector_id||p.live_mode!==false)throw Error('Payment mismatch');
+ const amount=p.transaction_amount_refunded;
+ if(p.status==='charged_back')return {kind:'chargeback',amount:intent.amount_ars};
+ if(!Number.isSafeInteger(amount)||amount<0||amount>intent.amount_ars)throw Error('Invalid refund');
+ if(p.status==='refunded'){if(amount!==intent.amount_ars)throw Error('Invalid full refund');return {kind:'refund',amount};}
+ if(p.status==='approved'&&amount>0)return {kind:amount===intent.amount_ars?'refund':'partial_refund',amount};
+ return null;
+}
+
 export async function reconcileCommission(env,id,payment,fetcher=fetch){
  if(!commissionCheckoutReady(env))return 503;
  if(!/^[0-9a-f-]{36}$/.test(id??'')||!/^[1-9]\d{0,19}$/.test(payment??''))return 400;
@@ -12,11 +22,17 @@ export async function reconcileCommission(env,id,payment,fetcher=fetch){
  if(!response.ok)return 503;
  const p=await response.json();
  if(String(p.id)!==payment)return 409;
+ const prior=await db.prepare('SELECT provider_reference FROM commission_settlements WHERE id=?').bind(id).first();
+ if(prior){
+  if(prior.provider_reference!=='mp:'+payment)return 409;
+  let reversal;try{reversal=commissionReversal(p,intent,payment);}catch{return 409;}
+  if(!reversal)return p.status==='approved'&&p.transaction_amount_refunded===0?200:202;
+  await db.prepare("INSERT INTO commission_payment_reversals(settlement_id,kind,amount_ars,observed_at) VALUES(?,?,?,?) ON CONFLICT(settlement_id) DO UPDATE SET kind=excluded.kind,amount_ars=excluded.amount_ars,observed_at=excluded.observed_at WHERE excluded.amount_ars>=commission_payment_reversals.amount_ars AND (commission_payment_reversals.kind<>'chargeback' OR excluded.kind='chargeback')").bind(id,reversal.kind,reversal.amount,Date.now()).run();
+  return 200;
+ }
  if(p.status!=='approved'||p.transaction_amount_refunded!==0)return 202;
  let verified;
  try{verified=verifyApprovedPayment(p,{reference:intent.external_reference,amountArs:intent.amount_ars,collectorId:intent.collector_id,liveMode:false});}catch{return 409;}
- const prior=await db.prepare('SELECT provider_reference FROM commission_settlements WHERE id=?').bind(id).first();
- if(prior)return prior.provider_reference===verified.providerReference?200:409;
  try{
  await db.batch([
  db.prepare("INSERT INTO commission_settlements(id,driver_id,provider_reference,amount_ars,verified_at) SELECT id,driver_id,?,amount_ars,? FROM commission_checkout_intents WHERE id=? AND status IN ('creating','ready','review') AND NOT EXISTS(SELECT 1 FROM commission_settlements WHERE id=? OR provider_reference=?)").bind(verified.providerReference,Date.now(),id,id,verified.providerReference),
