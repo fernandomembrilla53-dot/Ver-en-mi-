@@ -326,6 +326,7 @@ test('payment selection and verified settlement credits cannot double count', as
 });
 
 test('commission checkout, signed webhook, reconciliation and reversals through real local ledger', async t => {
+  t.mock.method(Date,'now',()=>Date.parse('2026-11-13T15:00:00Z'));
   let payment, preference, calls=0;
   const f=fixture(t, async (url, options)=>{
     assert.equal(options.headers.Authorization,'Bearer TEST-offline-commission');
