@@ -11,14 +11,14 @@ test("health requires a configured database",async()=>{
   assert.equal((await worker.fetch(request(),{})).status,503);
 });
 test("health checks schema and preserves disabled rides",async()=>{
-  const response=await worker.fetch(request(),{DB:db(30),ENABLE_LIVE_RIDES:"false"});
+  const response=await worker.fetch(request(),{DB:db(33),ENABLE_LIVE_RIDES:"false"});
   assert.equal(response.status,200);
   const body=await response.json();
   assert.equal(body.database,"ready");
   assert.equal(body.mode,"demo");
 });
 test("health rejects incomplete schema or unavailable database without leaking errors",async()=>{
-  for(const DB of [...Array.from({length:30},(_,count)=>db(count)),db(30,true)]){
+  for(const DB of [...Array.from({length:33},(_,count)=>db(count)),db(33,true)]){
     const response=await worker.fetch(request(),{DB});
     assert.equal(response.status,503);
     assert.equal((await response.json()).error,"Base de datos no disponible o esquema incompleto.");
