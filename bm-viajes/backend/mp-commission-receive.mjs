@@ -57,10 +57,7 @@ export async function receiveCommission(env,req,fetcher=fetch){
 export async function reconcileCommissionPending(env,fetcher=fetch,now=Date.now()){
  if(!commissionCheckoutReady(env))return {checked:0,verified:0,review:0};
  const db=env.DB,result={checked:0,verified:0,review:0};
- const count=await db.prepare("SELECT COUNT(*) AS n FROM commission_checkout_intents WHERE status IN ('creating','ready','review','paid')").first();
- const n=Number(count?.n||0);if(!n)return result;
- const offset=(Math.floor(now/600000)*5)%n;
- const rows=(await db.prepare("SELECT i.id,i.external_reference,i.collector_id,s.provider_reference FROM commission_checkout_intents i LEFT JOIN commission_settlements s ON s.id=i.id WHERE i.status IN ('creating','ready','review','paid') ORDER BY i.created_at,i.id LIMIT 5 OFFSET ?").bind(offset).all()).results;
+ const rows=(await db.prepare("SELECT i.id,i.external_reference,i.collector_id,s.provider_reference FROM commission_checkout_intents i LEFT JOIN commission_settlements s ON s.id=i.id LEFT JOIN commission_reconcile_checks c ON c.intent_id=i.id WHERE i.status IN ('creating','ready','review','paid') ORDER BY COALESCE(c.checked_at,0),i.created_at,i.id LIMIT 5").all()).results;
  for(const row of rows){
   result.checked++;
   try{
@@ -81,6 +78,7 @@ export async function reconcileCommissionPending(env,fetcher=fetch,now=Date.now(
    }
    if(await reconcileCommission(env,row.id,payment,fetcher)===200)result.verified++;else result.review++;
   }catch{result.review++;}
+  await db.prepare("INSERT INTO commission_reconcile_checks(intent_id,checked_at) VALUES(?,?) ON CONFLICT(intent_id) DO UPDATE SET checked_at=MAX(checked_at,excluded.checked_at)").bind(row.id,now).run();
  }
  return result;
 }
