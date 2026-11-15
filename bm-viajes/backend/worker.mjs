@@ -2,6 +2,7 @@ import {gmailReady,sendGmailCode} from "./gmail.mjs";
 import {maps} from "./maps.mjs";
 import {operations} from "./operations.mjs";
 import {receivePayment} from "./mp-receive.mjs";
+import {reconcilePending} from "./mp-reconcile.mjs";
 import {createRideCheckout} from "./mp-checkout.mjs";
 import {sandboxReady,beginOAuth,finishOAuth} from "./mp-oauth.mjs";
 import { estimateUrbanFare, TARIFF } from "./tariff.mjs";
@@ -400,6 +401,7 @@ export default {
  async scheduled(event,env,ctx){
    const now=Date.now();
    ctx.waitUntil(Promise.all([
+    reconcilePending(env).catch(()=>{console.error("BM Viajes: reconciliation failed");}),
     env.DB.prepare("DELETE FROM map_cache WHERE expires_at<?").bind(now).run(),
     env.DB.prepare("DELETE FROM mp_oauth_states WHERE expires_at<?").bind(now).run(),
     // A crashed checkout must be reviewed, never automatically recreated (duplicate-payment risk).
