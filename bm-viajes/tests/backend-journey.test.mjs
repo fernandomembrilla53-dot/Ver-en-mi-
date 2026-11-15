@@ -350,6 +350,12 @@ test('commission checkout, signed webhook, reconciliation and reversals through 
   Object.assign(env,{ENABLE_LIVE_RIDES:'false',MP_COMMISSION_SANDBOX_ENABLED:'true',MP_COMMISSION_ACCESS_TOKEN:'TEST-offline-commission',MP_COMMISSION_COLLECTOR_ID:'456',MP_COMMISSION_WEBHOOK_URL:'https://backend.example.invalid/api/mp/commission/webhook',MP_COMMISSION_WEBHOOK_SECRET:'offline-webhook-secret'});
   const ledger=()=>api('GET','/driver/ledger',driver.token);
   assert.equal((await ledger()).commission_due_ars,400);
+  const webhookSecret=env.MP_COMMISSION_WEBHOOK_SECRET;
+  delete env.MP_COMMISSION_WEBHOOK_SECRET;
+  assert.equal((await ledger()).settlements_enabled,false);
+  await api('POST','/driver/commissions/checkout',driver.token,undefined,503);
+  assert.equal(calls,0);
+  env.MP_COMMISSION_WEBHOOK_SECRET=webhookSecret;
   assert.equal((await ledger()).settlements_enabled,true);
   await api('POST','/driver/commissions/checkout',rider.token,undefined,403);
   const checkout=await api('POST','/driver/commissions/checkout',driver.token);
@@ -381,4 +387,16 @@ test('commission checkout, signed webhook, reconciliation and reversals through 
   assert.equal((await ledger()).commission_due_ars,400);
   assert.equal((await ledger()).settlements.length,1);
   assert.equal((await DB.prepare('SELECT amount_ars FROM commission_payment_reversals WHERE settlement_id=?').bind(intent.id).first()).amount_ars,400);
+});
+
+
+test('health rejects incomplete financial schema', async t => {
+  const {api,DB}=fixture(t);
+  assert.equal((await api('GET','/health')).database,'ready');
+  for (const name of ['commission_checkout_intents','commission_payment_reversals','commission_reconcile_checks']) {
+    await DB.prepare('ALTER TABLE '+name+' RENAME TO '+name+'_missing').run();
+    await api('GET','/health',null,undefined,503);
+    await DB.prepare('ALTER TABLE '+name+'_missing RENAME TO '+name).run();
+  }
+  assert.equal((await api('GET','/health')).database,'ready');
 });
