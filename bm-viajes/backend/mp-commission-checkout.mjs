@@ -2,7 +2,7 @@
 export function commissionCheckoutReady(env){
  return env.MP_COMMISSION_SANDBOX_ENABLED==='true' && env.ENABLE_LIVE_RIDES==='false' &&
  typeof env.MP_COMMISSION_ACCESS_TOKEN==='string' && env.MP_COMMISSION_ACCESS_TOKEN.startsWith('TEST-') &&
- /^[1-9]\d*$/.test(env.MP_COMMISSION_COLLECTOR_ID||'') && !!env.MP_COMMISSION_WEBHOOK_URL;
+ /^[1-9]\d*$/.test(env.MP_COMMISSION_COLLECTOR_ID||'') && !!env.MP_COMMISSION_WEBHOOK_URL && typeof env.MP_COMMISSION_WEBHOOK_SECRET==='string' && !!env.MP_COMMISSION_WEBHOOK_SECRET.trim();
 }
 export async function createCommissionCheckout(env,user,fetcher=fetch){
  if(!commissionCheckoutReady(env)||user.driver_status!=='approved')throw Error('Commission checkout unavailable');
