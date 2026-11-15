@@ -402,6 +402,8 @@ export default {
    ctx.waitUntil(Promise.all([
     env.DB.prepare("DELETE FROM map_cache WHERE expires_at<?").bind(now).run(),
     env.DB.prepare("DELETE FROM mp_oauth_states WHERE expires_at<?").bind(now).run(),
+    // A crashed checkout must be reviewed, never automatically recreated (duplicate-payment risk).
+    env.DB.prepare("UPDATE mp_checkout_intents SET status='review' WHERE status='creating' AND created_at<?").bind(now-1800000).run(),
     env.DB.prepare("DELETE FROM otp_challenges WHERE expires_at<?").bind(now).run(),
     env.DB.prepare("DELETE FROM sessions WHERE expires_at<?").bind(now).run(),
     env.DB.prepare("DELETE FROM ride_positions WHERE updated_at<?").bind(now-180000).run(),
