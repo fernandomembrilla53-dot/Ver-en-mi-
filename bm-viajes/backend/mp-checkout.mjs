@@ -4,7 +4,7 @@ import {unseal} from './mp-vault.mjs';
 import {refreshDriverToken} from './mp-refresh.mjs';
 import {sandboxReady} from './mp-oauth.mjs';
 export async function createRideCheckout(env,user,rideId,fetcher=fetch){
- if(!sandboxReady(env)||!env.MP_WEBHOOK_URL)throw Error('Checkout unavailable');
+ if(!sandboxReady(env)||!env.MP_WEBHOOK_URL||typeof env.MP_WEBHOOK_SECRET!=='string'||!env.MP_WEBHOOK_SECRET.trim())throw Error('Checkout unavailable');
  const db=env.DB;
  const r=await db.prepare(`SELECT r.id,r.driver_id,t.total_ars,t.commission_ars,a.seller_id,a.token_cipher,a.expires_at FROM rides r JOIN ride_totals t ON t.ride_id=r.id JOIN ride_payment_methods m ON m.ride_id=r.id JOIN mp_driver_accounts a ON a.driver_id=r.driver_id WHERE r.id=? AND r.rider_id=? AND r.status='completed' AND m.method='mercadopago'`).bind(rideId,user.id).first();
  if(!r)throw Error('Ride or seller unavailable');
