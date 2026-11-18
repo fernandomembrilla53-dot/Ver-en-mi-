@@ -1,10 +1,7 @@
 name: BM Viajes - Desplegar piloto independiente
+# Explicit manual approval required: no automatic D1 writes or Worker deployment.
 on:
-  push:
-    branches: [bm-viajes-fare-snapshot]
-    paths:
-      - 'bm-viajes/**'
-      - '.github/workflows/bm-viajes-pilot-deploy.yml'
+  workflow_dispatch:
 permissions:
   contents: read
 concurrency:
