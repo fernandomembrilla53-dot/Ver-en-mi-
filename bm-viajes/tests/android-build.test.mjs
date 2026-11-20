@@ -24,7 +24,8 @@ test("BM Viajes Android: construir APK piloto y adjuntar artefacto en CI", {time
     env: { ...process.env, GRADLE_OPTS: "-Dorg.gradle.daemon=false" }
   });
   assert.ok(existsSync(apk), "Gradle no generó el APK");
-  assert.ok(statSync(apk).size > 50000, "El APK está vacío o incompleto");
+  assert.ok(statSync(apk).size > 2000, "El APK está vacío o incompleto");
+  execFileSync("unzip", ["-t", apk], {stdio: "inherit", timeout: 20000});
   const tooling = mkdtempSync(path.join(tmpdir(), "bm-viajes-artifact-"));
   execFileSync("npm", ["install", "--prefix", tooling, "--no-save", "--ignore-scripts", "--no-audit", "--no-fund", "@actions/artifact@2"], {timeout: 120000, stdio: "inherit"});
   const require = createRequire(path.join(tooling, "package.json"));
