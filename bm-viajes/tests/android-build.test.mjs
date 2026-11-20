@@ -12,7 +12,7 @@ import { createRequire } from "node:module";
  */
 test("BM Viajes Android: construir APK piloto y adjuntar artefacto en CI", {timeout: 540000}, async (t) => {
   const branch = "bm-viajes-android-pilot-apk-20261120";
-  if (process.env.GITHUB_ACTIONS !== "true" || process.env.GITHUB_HEAD_REF !== branch) {
+  if (process.env.GITHUB_ACTIONS !== "true" || process.env.GITHUB_HEAD_REF !== branch && process.env.GITHUB_REF !== "refs/heads/" + branch) {
     t.skip("Compilación habilitada únicamente en el PR aislado de Android");
     return;
   }
