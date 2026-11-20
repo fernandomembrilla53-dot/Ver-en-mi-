@@ -146,12 +146,21 @@ $("request-review").addEventListener("click",async()=>{
  });
 });
 $("logout").addEventListener("click",async()=>{
- const current=token;
+ const current=token,epoch=sessionGeneration;
  clearSession();notice("Sesión cerrada en este dispositivo.");
+ if(!current)return;
  try{
-  if(current){token=current;await api("/api/auth/logout","POST");}
- }catch{notice("Sesión local cerrada, pero no se pudo confirmar la revocación en el servidor.",true);}
- finally{token="";sessionStorage.removeItem("bm-viajes-pilot-token");}
+  const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),15000);
+  try{
+   const r=await fetch(base+"/api/auth/logout",{
+    method:"POST",headers:{"Authorization":"Bearer "+current,"Content-Type":"application/json"},
+    cache:"no-store",mode:"cors",signal:controller.signal
+   });
+   if(!r.ok)throw Error("No se confirmó la revocación.");
+  }finally{clearTimeout(timeout);}
+ }catch{
+  if(sessionGeneration===epoch+1&&!user)notice("Sesión local cerrada; la revocación remota no pudo confirmarse. No reutilices la sesión anterior.",true);
+ }
 });
 async function boot(){
  if(!base){notice("El servidor de registro todavía no está configurado. No ingreses datos hasta que esté disponible.",true,"server-status");return;}
