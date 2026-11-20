@@ -1,0 +1,120 @@
+name: BM Viajes - Configurar correo Gmail (solo OTP)
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bm-viajes-gmail-only
+  cancel-in-progress: false
+
+jobs:
+  gmail:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: d41d328f1e8a9ba2131aba8b57923f2a
+      BM_VIAJES_GMAIL_CLIENT_ID: ${{ secrets.BM_VIAJES_GMAIL_CLIENT_ID }}
+      BM_VIAJES_GMAIL_CLIENT_SECRET: ${{ secrets.BM_VIAJES_GMAIL_CLIENT_SECRET }}
+      BM_VIAJES_GMAIL_REFRESH_TOKEN: ${{ secrets.BM_VIAJES_GMAIL_REFRESH_TOKEN }}
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - name: Verificar credenciales sin exponerlas
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os
+          required=[
+            'CLOUDFLARE_API_TOKEN',
+            'BM_VIAJES_GMAIL_CLIENT_ID',
+            'BM_VIAJES_GMAIL_CLIENT_SECRET',
+            'BM_VIAJES_GMAIL_REFRESH_TOKEN',
+          ]
+          missing=[name for name in required if not os.environ.get(name)]
+          if missing:
+            raise SystemExit(
+              'Faltan secretos de repositorio GitHub Actions: '+', '.join(missing)
+              + '. No se modificó Cloudflare.'
+            )
+          if not os.environ['BM_VIAJES_GMAIL_CLIENT_ID'].endswith('.apps.googleusercontent.com'):
+            raise SystemExit('El ID del cliente OAuth de Gmail no parece válido.')
+          print('Entradas disponibles; no se imprimen credenciales.')
+          PY
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Verificar destino exclusivo y Worker existente
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json,os,pathlib,urllib.request,urllib.error
+          cfg=json.loads(pathlib.Path('bm-viajes/backend/wrangler.json').read_text())
+          assert cfg['name']=='bm-viajes-api', 'Destino Worker inesperado'
+          assert cfg['vars']['ENABLE_LIVE_RIDES']=='false', 'No operar si el piloto está habilitado'
+          assert cfg['vars']['MP_SANDBOX_ENABLED']=='false', 'No tocar pagos'
+          assert cfg['d1_databases'][0]['database_name']=='bm-viajes-db'
+          url='https://api.cloudflare.com/client/v4/accounts/'+os.environ['CLOUDFLARE_ACCOUNT_ID']+'/workers/scripts/bm-viajes-api'
+          req=urllib.request.Request(url,headers={
+            'Authorization':'Bearer '+os.environ['CLOUDFLARE_API_TOKEN'],
+            'Accept':'application/json'
+          },method='GET')
+          try:
+            with urllib.request.urlopen(req,timeout=20) as response:
+              if response.status != 200: raise RuntimeError('Worker no disponible')
+          except urllib.error.HTTPError as e:
+            raise SystemExit('No se pudo comprobar bm-viajes-api. Cloudflare HTTP '+str(e.code)+'. Verificá permisos del token.')
+          print('Comprobado Worker bm-viajes-api. No se desplegará código ni se ejecutará D1.')
+          PY
+
+      - name: Preparar herramienta oficial
+        run: npm install --no-save --no-package-lock wrangler@4
+
+      - name: Configurar únicamente los cinco secretos del correo
+        shell: bash
+        working-directory: bm-viajes/backend
+        run: |
+          set -euo pipefail
+          # Nunca activar EMAIL_PROVIDER antes de cargar las credenciales.
+          printf '%s' "$BM_VIAJES_GMAIL_CLIENT_ID" | ../../node_modules/.bin/wrangler secret put GMAIL_CLIENT_ID --config wrangler.json
+          printf '%s' "$BM_VIAJES_GMAIL_CLIENT_SECRET" | ../../node_modules/.bin/wrangler secret put GMAIL_CLIENT_SECRET --config wrangler.json
+          printf '%s' "$BM_VIAJES_GMAIL_REFRESH_TOKEN" | ../../node_modules/.bin/wrangler secret put GMAIL_REFRESH_TOKEN --config wrangler.json
+          printf '%s' 'fernandomembrilla53@gmail.com' | ../../node_modules/.bin/wrangler secret put GMAIL_SENDER_EMAIL --config wrangler.json
+          printf '%s' 'gmail' | ../../node_modules/.bin/wrangler secret put EMAIL_PROVIDER --config wrangler.json
+          echo 'Secretos instalados en bm-viajes-api, sin mostrarlos. No se alteraron pagos, D1 ni otros Workers.'
+
+      - name: Confirmar configuración y pedir un único código de prueba
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json,time,urllib.request
+          base='https://bm-viajes-api.fernandomembrilla53.workers.dev'
+          health=None
+          for attempt in range(8):
+            try:
+              with urllib.request.urlopen(base+'/api/health',timeout=20) as r:
+                health=json.load(r)
+              if health.get('email_provider')=='gmail' and health.get('email_configured') is True and health.get('database')=='ready':
+                break
+            except Exception:
+              pass
+            time.sleep(4)
+          else:
+            raise SystemExit('El healthcheck de Gmail no confirmó email_configured=true. Revisar Cloudflare; no se probó envío.')
+          req=urllib.request.Request(base+'/api/auth/start',method='POST',headers={
+            'Origin':'https://fernandomembrilla53-dot.github.io',
+            'Content-Type':'application/json',
+            'User-Agent':'BM-Viajes-Gmail-Setup/1.0',
+          },data=json.dumps({'email':'fernandomembrilla53@gmail.com'}).encode())
+          with urllib.request.urlopen(req,timeout=30) as resp:
+            data=json.load(resp)
+          if not data.get('ok'):
+            raise SystemExit('La API no aceptó el envío del código de prueba.')
+          print('Servidor listo; solicitud de código de prueba aceptada para el Gmail del propietario.')
+          print('Comprobar recepción real desde la bandeja de entrada o spam; el flujo no extrae ni publica el código.')
+          PY
