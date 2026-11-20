@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#102438">
+<meta name="description" content="Registro de conductores de BM Viajes para el piloto en Ayacucho. Inscripción sujeta a revisión.">
+<title>Registrate como conductor | BM Viajes</title>
+<link rel="icon" href="./icon.svg"><link rel="stylesheet" href="./conductores.css">
+</head>
+<body>
+<header class="masthead"><div class="shell">
+  <nav><a href="./" class="brand"><img src="./icon.svg" alt="" width="40" height="40"><span>BM Viajes</span></a><a href="./" class="nav-back">Volver a la app</a></nav>
+  <div class="hero"><div class="eyebrow">BM Viajes · Ayacucho</div><h1>Conducí con nosotros.</h1><p>Inscribite para participar del piloto. Trabajá con tu propio vehículo, sujeto a verificación y habilitación correspondiente.</p><div class="hero-status">El registro <strong>no habilita viajes ni cobros reales</strong>.</div></div>
+</div></header>
+<main class="shell">
+  <div id="server-status" class="notice" role="status" aria-live="polite">Comprobando disponibilidad del registro…</div>
+  <section id="login" class="card" aria-labelledby="login-title">
+    <div class="step-label">Paso 1 de 3 · Acceso</div><h2 id="login-title">Registrate con tu correo</h2>
+    <p class="muted">Te enviamos un código de seis dígitos. Usá un correo al que tengas acceso; nunca compartas el código.</p>
+    <form id="email-form">
+      <label for="email">Correo electrónico</label><input id="email" type="email" autocomplete="email" maxlength="254" placeholder="tu-correo@ejemplo.com" required>
+      <button id="send-code" class="primary" type="submit" disabled>Recibir código</button>
+    </form>
+    <form id="code-form" hidden>
+      <label for="access-code">Código recibido por correo</label><input id="access-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" placeholder="000000" required>
+      <button id="verify-code" class="primary" type="submit">Verificar correo</button>
+      <p class="muted">Si cambiás el correo, solicitá otro código.</p>
+    </form>
+  </section>
+  <div id="account" hidden>
+    <section class="card account-head">
+      <div><div class="step-label">Cuenta verificada</div><h2>Tu inscripción</h2><p id="account-email" class="muted"></p><p id="approval-status" class="status-note" role="status"></p></div>
+      <button class="secondary" id="logout" type="button">Cerrar sesión</button>
+    </section>
+    <section class="card" aria-labelledby="profile-title">
+      <div class="step-label">Paso 2 de 3 · Datos del conductor</div><h2 id="profile-title">Tus datos y vehículo</h2>
+      <p class="muted">Los datos se guardan en el servidor del piloto para revisión. Modificarlos requiere una nueva revisión.</p>
+      <form id="profile-form">
+        <label for="display-name">Nombre que verán los pasajeros</label>
+        <input id="display-name" name="display_name" maxlength="80" autocomplete="name" placeholder="Nombre y apellido" required>
+        <label for="vehicle">Marca, modelo y color del vehículo</label>
+        <input id="vehicle" name="vehicle" maxlength="100" placeholder="Ej.: Renault Logan blanco" required>
+        <label for="plate">Patente</label><input id="plate" name="plate" maxlength="12" placeholder="AA123BB" autocapitalize="characters" required>
+        <button class="primary" id="save-profile" type="submit">Guardar mis datos</button>
+      </form>
+    </section>
+    <section class="card" aria-labelledby="documents-title">
+      <div class="step-label">Paso 3 de 3 · Documentación</div><h2 id="documents-title">Presentá tus documentos</h2>
+      <p class="muted">Identidad, licencia de conducir, habilitación correspondiente, seguro para transporte y VTV. Se almacenan cifrados en el servidor para revisión autorizada. No se publican en la aplicación.</p>
+      <div id="document-status" class="docs" aria-live="polite"></div>
+      <form id="document-form">
+        <label for="doc-kind">Tipo de documento</label>
+        <select id="doc-kind" required>
+          <option value="identity">Identidad</option><option value="license">Licencia de conducir</option>
+          <option value="permit">Habilitación</option><option value="insurance">Seguro para transporte</option>
+          <option value="vtv">VTV</option>
+        </select>
+        <label for="doc-expiry">Fecha de vencimiento</label>
+        <input type="date" id="doc-expiry" required>
+        <p class="helper">Para documentos sin vencimiento, ingresá la fecha de próxima revisión informada por la administración.</p>
+        <label for="doc-file">Foto legible (JPG o PNG, máximo 10 MB antes de comprimir)</label>
+        <input type="file" id="doc-file" accept="image/jpeg,image/png" required>
+        <label class="consent"><input type="checkbox" id="accept-privacy" required> Leí la <a href="./privacidad.html" target="_blank" rel="noopener">política de privacidad</a> y autorizo el tratamiento de esta documentación exclusivamente para revisar mi inscripción.</label><button class="secondary" id="upload-document" type="submit" disabled>Enviar documento a revisión</button>
+      </form>
+    </section>
+    <section class="card">
+      <h2>Solicitar revisión</h2><p class="muted" id="review-hint">Guardá tu perfil y presentá los cinco documentos para enviar la solicitud.</p>
+      <label class="consent"><input type="checkbox" id="accept-review"> Entiendo que la inscripción no me autoriza a trabajar ni a transportar pasajeros. La habilitación depende de revisión manual y requisitos legales y de seguridad.</label>
+      <button class="primary" id="request-review" type="button" disabled>Enviar solicitud de conductor</button>
+      <p class="muted">Podés consultar el estado volviendo a entrar con tu correo. No pagues ni hagas viajes desde el piloto.</p>
+      <a class="text-link" href="./operaciones.html">Ir a mi cuenta y soporte</a>
+    </section>
+  </div>
+  <div id="feedback" class="notice" role="status" aria-live="polite" hidden></div>
+  <section class="card small"><h2>Cómo funciona</h2><div class="steps"><p><strong>1.</strong> Verificás tu correo.</p><p><strong>2.</strong> Guardás tus datos y documentos.</p><p><strong>3.</strong> BM Viajes los revisa antes de aprobar.</p></div><p class="muted">Si el servidor no está preparado, el registro permanecerá deshabilitado; no se almacenará documentación de manera local.</p><a href="./privacidad.html">Política de privacidad</a></section>
+</main><footer>BM Viajes · BM-Apps · Ayacucho · Piloto sin viajes ni cobros reales</footer>
+<script src="./config.js"></script><script src="./conductores.js" defer></script>
+</body></html>
