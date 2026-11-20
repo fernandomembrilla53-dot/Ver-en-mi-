@@ -4,3 +4,57 @@
 
 /* Marca BM Viajes; mantiene las claves locales existentes. */
 .wordmark{font-size:42px;letter-spacing:-1.8px}.wordmark span{font-weight:700}
+
+
+/* BM Viajes: refinamiento responsive y accesibilidad de la interfaz del piloto. */
+:root{color-scheme:light}
+.app-shell{width:100%;min-width:0}
+.screen{min-width:0}
+.screen[hidden]{display:none!important}
+button,a,summary{touch-action:manipulation}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:3px solid #176d55;outline-offset:3px}
+.destination-search,.city-card,.option-list button,.option-list a,.account-grid button{transition:background-color .18s ease,box-shadow .18s ease,transform .18s ease}
+.destination-search:hover,.option-list button:hover,.option-list a:hover,.account-grid button:hover{background:#e8eeea}
+.city-card:hover{background:#dcebe2}
+.quick-options button:hover .option-art{background:#e4ede6}
+.destination-search:active,.city-card:active{transform:scale(.995)}
+.bottom-nav button{min-height:52px}
+.bottom-nav button[aria-current=page]{color:#123d2d}
+.uver-header .city{min-height:44px}
+.screen-heading .back{flex-shrink:0}
+.screen-heading h1{min-width:0;overflow-wrap:anywhere}
+input,select,textarea{font-size:16px}
+@media(max-width:480px){
+ .app-shell{padding-left:16px;padding-right:16px;padding-bottom:calc(112px + env(safe-area-inset-bottom))}
+ .uver-header{height:60px}
+ .wordmark{font-size:38px;margin:14px 0 25px}
+ .destination-search{font-size:clamp(19px,5.5vw,24px);padding:19px 18px;gap:12px}
+ .quick-options{gap:10px}
+ .quick-options b{font-size:13px}
+ .option-art{height:78px;border-radius:18px}
+ .city-card{min-height:208px}
+ .street-art{opacity:.5}
+ .bottom-nav{width:calc(100% - 16px);bottom:max(8px,env(safe-area-inset-bottom));padding:6px}
+ .bottom-nav button{font-size:11px;min-width:0}
+ .services{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+ .svc{padding:12px 7px}
+ .svc b{white-space:normal;overflow-wrap:anywhere}
+ .map-panel{height:300px;min-height:300px}
+ .bm-controls button{min-height:48px}
+ .account-grid button{font-size:15px;padding:15px;overflow-wrap:anywhere}
+}
+@media(max-width:340px){
+ .quick-options{gap:6px}
+ .option-art{height:70px}
+ .destination-search{font-size:18px}
+ .bottom-nav button{font-size:10px}
+ .map-panel{height:270px;min-height:270px}
+}
+@media(prefers-reduced-motion:reduce){
+ .destination-search,.city-card,.option-list button,.option-list a,.account-grid button{transition:none!important}
+ .destination-search:active,.city-card:active{transform:none}
+}
+@media(prefers-contrast:more){
+ .demo-badge,.bottom-nav,.svc,.input-wrap{border:2px solid currentColor}
+ .profile-caption,.lead,.home-note p,.option-list p{color:#33463a}
+}
