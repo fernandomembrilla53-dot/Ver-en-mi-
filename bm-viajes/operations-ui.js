@@ -10,6 +10,17 @@ async function compact(file){if(!['image/jpeg','image/png'].includes(file.type)|
 $('documents').onsubmit=run(async()=>{const f=$('documents'),photo=f.elements.photo.files[0];const encoded=await compact(photo);await api('/driver/documents',{kind:f.elements.kind.value,expires_at:Date.parse(f.elements.expiry.value+'T23:59:59-03:00'),mime:'image/jpeg',data:encoded});f.reset();await profile();status('Documento cifrado guardado; revisión pendiente.');});
 async function earnings(){const r=await api('/driver/earnings?days='+$('period').value),ledger=await api('/driver/ledger');$('earnings').textContent='Período móvil de '+r.days+' días\n'+JSON.stringify({viajes_confirmados:r.summary.rides,bruto_ARS:r.summary.gross_ars,comisión_ARS:r.summary.commission_ars,neto_antes_costos_ARS:r.summary.net_ars,reversiones_ARS:r.reversals_ars,libro_mayor:ledger},null,2);}
 $('earnings-refresh').onclick=run(earnings);
+$('statement-refresh').onclick=run(async()=>{
+  const r=await api('/driver/finance');
+  $('statement').textContent='Saldo de comisión ARS: '+r.balances.commission_due_ars+
+    '\\nVencido ARS: '+r.balances.overdue_ars+
+    '\\nBloqueo automático de nuevos viajes: '+(r.balances.auto_block_active?'Sí':'No')+
+    '\\nViajes mostrados: '+r.rides.length+
+    '\\n'+r.rides.map(x=>new Date(x.created_at).toLocaleString('es-AR')+
+      ' · '+x.id.slice(0,8)+' · '+x.status+
+      ' · importe '+(x.total_ars===null?'pendiente':x.total_ars)+' ARS'+
+      ' · comisión '+(x.commission_posted?x.commission_ars:'no acreditada')+' ARS').join('\\n');
+});
 $('mp-connect').onclick=run(async()=>{const r=await api('/driver/mp/oauth',{});const u=new URL(r.authorization_url);if(u.protocol!=='https:'||u.hostname!=='auth.mercadopago.com.ar')throw Error('Destino OAuth inesperado.');location.assign(u.href);});
 async function incidents(){$('incidents').textContent=JSON.stringify((await api('/incidents')).incidents,null,2);}
 $('support').onsubmit=run(async()=>{await api('/incidents',data($('support')));$('support').reset();await incidents();status('Solicitud registrada.');});
