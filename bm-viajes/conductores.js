@@ -166,7 +166,8 @@ async function boot(){
  if(!base){notice("El servidor de registro todavía no está configurado. No ingreses datos hasta que esté disponible.",true,"server-status");return;}
  try{
   const health=await api("/api/health","GET",undefined,false);
-  if(health.database!=="ready"||health.email_configured!==true)throw Error("Base de datos o correo de acceso pendientes de configuración.");
+  if(health.database!=="ready")throw Error("La base de datos del piloto todavía no está lista.");
+  if(health.email_configured!==true)throw Error("Falta habilitar el envío de códigos por correo en Cloudflare. El panel todavía no admite inscripciones.");
   ready=true;notice("Servidor de registro disponible. Las inscripciones requieren revisión manual.",false,"server-status");
   $("send-code").disabled=false;
   if(token){
