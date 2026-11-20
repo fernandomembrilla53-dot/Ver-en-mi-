@@ -30,7 +30,10 @@ test("BM Viajes Android: construir APK piloto y adjuntar artefacto en CI", {time
   execFileSync("npm", ["install", "--prefix", tooling, "--no-save", "--ignore-scripts", "--no-audit", "--no-fund", "@actions/artifact@2"], {timeout: 120000, stdio: "inherit"});
   const require = createRequire(path.join(tooling, "package.json"));
   const artifact = require("@actions/artifact");
-  const client = typeof artifact.create === "function" ? artifact.create() : artifact;
+  const client = typeof artifact.uploadArtifact === "function" ? artifact :
+    typeof artifact.DefaultArtifactClient === "function" ? new artifact.DefaultArtifactClient() :
+    typeof artifact.create === "function" ? artifact.create() : null;
+  assert.ok(client && typeof client.uploadArtifact === "function", "SDK de artefactos sin método de subida");
   const upload = await client.uploadArtifact("bm-viajes-piloto-android-apk", [apk], path.dirname(apk), {retentionDays: 7});
   assert.ok(upload, "La subida del artefacto no devolvió resultado");
   console.log("APK piloto generado y adjuntado al workflow: " + path.basename(apk) + " (" + statSync(apk).size + " bytes)");
