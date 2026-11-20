@@ -117,3 +117,39 @@ test("admin financial pagination and inputs, private access",async t=>{
  assert.equal(all.policy.auto_block_enabled,false);
  await assert.rejects(f.DB.prepare("UPDATE driver_ledger SET amount_ars=1").run(),/immutable ledger/);
 });
+
+test("atomic ride acceptance refuses overdue driver and allows new ride after full verified settlement",async t=>{
+ const f=await setup(t);
+ await f.cashRide();
+ f.env.ENABLE_LIVE_RIDES="true";
+ const ride=crypto.randomUUID(),now=Date.now();
+ await f.DB.prepare("INSERT INTO rides(id,rider_id,origin_lat,origin_lng,destination_lat,destination_lng,distance_air_km,status,created_at,updated_at,expires_at) VALUES(?,?,?,?,?,?,?,'requested',?,?,?)")
+   .bind(ride,f.members.rider.id,-37.1515,-58.4859,-37.16,-58.49,1.1,now,now,now+600000).run();
+ await f.DB.prepare("INSERT INTO ride_fares VALUES(?,'one_way','v1',4000,1000,0,0,?)").bind(ride,now).run();
+ await f.request("driver","/rides/"+ride+"/accept",{method:"POST",status:403});
+ assert.equal((await f.DB.prepare("SELECT driver_id,status FROM rides WHERE id=?").bind(ride).first()).status,"requested");
+ await f.pay(400);
+ await f.request("driver","/rides/"+ride+"/accept",{method:"POST"});
+ const record=await f.DB.prepare("SELECT driver_id,status FROM rides WHERE id=?").bind(ride).first();
+ assert.equal(record.driver_id,f.members.driver.id);
+ assert.equal(record.status,"accepted");
+ await f.cashRide({postedAt:Date.now()-10*DAY});
+ await f.request("driver","/rides/"+ride+"/status",{method:"POST",data:{status:"in_progress"}});
+ await f.request("driver","/rides/"+ride+"/status",{method:"POST",data:{status:"completed"}});
+ assert.equal((await f.DB.prepare("SELECT status FROM rides WHERE id=?").bind(ride).first()).status,"completed");
+});
+
+test("admin finance pagination scales beyond 50 drivers and does not merge records",async t=>{
+ const f=await setup(t);
+ for(let n=0;n<57;n++){
+  const email="transport"+String(n).padStart(3,"0")+"@example.invalid";
+  await f.DB.prepare("INSERT INTO users VALUES(?,?,?,?)").bind(crypto.randomUUID(),email,"pending",Date.now()).run();
+ }
+ const first=await f.request("admin","/admin/finance?offset=0");
+ assert.equal(first.drivers.length,50);
+ assert.equal(first.has_more,true);
+ const second=await f.request("admin","/admin/finance?offset=50");
+ assert.equal(second.drivers.length,8);
+ assert.equal(second.has_more,false);
+ assert.equal(new Set([...first.drivers,...second.drivers].map(x=>x.driver_id)).size,58);
+});
