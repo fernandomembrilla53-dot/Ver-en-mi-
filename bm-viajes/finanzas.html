@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="es-AR"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#102438"><link rel="icon" href="./icon.svg">
+<meta name="description" content="Administración privada de cuentas y viajes de conductores de BM Viajes">
+<title>BM Viajes | Administración de conductores</title>
+<style>
+:root{font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#193346;background:#f0f4f7}
+*{box-sizing:border-box}body{margin:0}header{background:#0d2840;color:#fff;padding:20px 16px 44px}header .wrap{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}header a{color:white}h1{margin:12px 0;font-size:clamp(26px,5vw,36px)}h2{margin:0 0 12px;font-size:21px}h3{margin:0 0 9px}.container{max-width:1080px;margin:-20px auto 30px;padding:0 13px}.card{background:#fff;border-radius:16px;border:1px solid #dfebf1;box-shadow:0 8px 25px #1431460d;padding:22px;margin:14px 0}.muted{color:#546e80;font-size:14px;line-height:1.5}label{font-size:14px;font-weight:700;display:block;margin:12px 0 6px}input,select,button{min-height:43px;font:inherit;border-radius:9px;padding:10px 12px}input,select{border:1px solid #bdcdd6;max-width:100%;width:100%}button{background:#e8a83b;color:#10283e;font-weight:800;border:0;cursor:pointer}button.secondary{background:#e4edf2}button:disabled{opacity:.45;cursor:not-allowed}.row{display:flex;align-items:end;gap:12px;flex-wrap:wrap}.row>*{flex:1;min-width:185px}.row>button{flex:0 0 auto;min-width:120px}.notice{padding:13px;border-radius:10px;background:#fff2d9;border:1px solid #e9d3a4;font-size:14px;line-height:1.5;margin:12px 0}.notice.error{background:#ffe9e9;border-color:#eababa}.notice.success{background:#eaf6ed;border-color:#b9ddc1}.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.stat{background:#f3f8fa;border-radius:13px;padding:15px}.stat strong{display:block;font-size:clamp(17px,2.5vw,26px);word-break:break-word}.stat span{font-size:12px;color:#577084}.scroll{overflow:auto;border-radius:10px;border:1px solid #e3edf0}table{width:100%;border-collapse:collapse;min-width:650px}th,td{text-align:left;padding:12px 10px;border-bottom:1px solid #edf2f4;font-size:13px}th{background:#f2f7f9;color:#38596c}tr:last-child td{border-bottom:0}td button{padding:8px;min-height:36px}.debt{font-weight:800}.flags{font-size:12px;color:#8b5300}.list{display:grid;gap:8px}.item{padding:13px;border:1px solid #e3ebf0;border-radius:12px;display:flex;gap:10px;align-items:start;justify-content:space-between;flex-wrap:wrap}.item small{color:#536e7d;display:block;margin-top:4px}.toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:13px 0}.toolbar button{min-width:110px}.text-link{display:inline-block;margin-top:10px}.visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}footer{text-align:center;padding:20px;color:#647e8c;font-size:12px}[hidden]{display:none!important}:focus-visible{outline:3px solid #d6aa59;outline-offset:2px}
+@media(max-width:680px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.card{padding:16px}.row>button{flex:1}}
+</style></head><body>
+<header><div class="wrap"><a href="./" aria-label="Volver a BM Viajes">BM Viajes</a><a href="./operaciones.html">Cuenta y operaciones</a></div><h1>Control de conductores</h1><p>Historial, comisiones en efectivo, pagos verificados y alertas de mora.</p></header>
+<main class="container">
+<p id="message" class="notice" role="status" aria-live="polite">Verificando servidor…</p>
+<section class="card" id="auth-panel">
+<h2>Acceso del administrador</h2><p class="muted">Solo cuentas previamente autorizadas pueden acceder. Enviamos un código de seis dígitos a tu correo.</p>
+<form id="email-form"><label for="email">Correo electrónico</label><div class="row"><input type="email" id="email" autocomplete="email" maxlength="254" required placeholder="correo@ejemplo.com"><button id="send-code" disabled>Enviar código</button></div></form>
+<form id="code-form" hidden><label for="code">Código de acceso</label><div class="row"><input id="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required><button id="verify">Ingresar</button></div></form>
+</section>
+<div id="dashboard" hidden>
+<section class="card">
+<div class="row"><div><h2>Resumen general</h2><p id="identity" class="muted"></p></div><button id="refresh" class="secondary">Actualizar cuentas</button><button id="logout" class="secondary">Cerrar sesión</button></div>
+<p class="muted" id="policy"></p>
+<div class="stats">
+<div class="stat"><strong id="total-drivers">—</strong><span>Choferes registrados</span></div>
+<div class="stat"><strong id="total-outstanding">—</strong><span>Comisiones por cobrar</span></div>
+<div class="stat"><strong id="total-overdue">—</strong><span>Deuda vencida</span></div>
+<div class="stat"><strong id="total-received">—</strong><span>Pagos verificados</span></div>
+</div>
+<p class="muted">Los importes se calculan desde el libro mayor y los pagos bancarios verificados, nunca desde capturas o montos informados por choferes.</p>
+</section>
+<section class="card">
+<h2>Cuentas de conductores</h2>
+<div class="row"><div><label for="filter">Mostrar</label><select id="filter"><option value="all">Todos</option><option value="unpaid">Con deuda</option><option value="overdue">Con deuda vencida</option></select></div><button id="reload" class="secondary">Filtrar</button></div>
+<div class="scroll"><table><thead><tr><th>Conductor</th><th>Estado</th><th>Comisiones</th><th>Pagó</th><th>Debe</th><th>Vencido</th><th>Detalle</th></tr></thead><tbody id="drivers"></tbody></table></div>
+<div class="toolbar"><button class="secondary" id="prev" disabled>Anterior</button><span id="page">Página 1</span><button class="secondary" id="next" disabled>Siguiente</button></div>
+</section>
+<section class="card" id="detail" hidden>
+<div class="row"><div><h2 id="detail-title">Estado de cuenta</h2><p id="detail-email" class="muted"></p></div><button class="secondary" id="close-detail">Cerrar detalle</button></div>
+<div class="stats"><div class="stat"><strong id="detail-balance">—</strong><span>Saldo a cobrar</span></div><div class="stat"><strong id="detail-overdue">—</strong><span>Saldo vencido</span></div><div class="stat"><strong id="detail-charges">—</strong><span>Comisiones generadas</span></div><div class="stat"><strong id="detail-paid">—</strong><span>Pagos verificados</span></div></div>
+<p class="notice" id="detail-status"></p>
+<h3>Historial de viajes del conductor</h3><p class="muted">El historial muestra también los viajes cancelados. Una comisión no se considera deuda hasta que el efectivo fue confirmado por pasajero y chofer.</p>
+<div class="scroll"><table><thead><tr><th>Fecha</th><th>Viaje</th><th>Estado</th><th>Cobro</th><th>Importe ARS</th><th>Comisión ARS</th></tr></thead><tbody id="history"></tbody></table></div>
+<div class="toolbar"><button id="history-prev" class="secondary" disabled>Anterior</button><span id="history-page">Página 1</span><button id="history-next" class="secondary" disabled>Siguiente</button></div>
+<h3>Comisiones registradas</h3><div id="charges" class="list"></div>
+<h3>Pagos acreditados</h3><div id="settlements" class="list"></div>
+<a class="text-link" href="./operaciones.html">Revisar comprobantes y registrar liquidaciones verificadas (requiere autorización)</a>
+</section>
+</div>
+<section class="card"><h2>Regla prevista para mora</h2><p class="muted">Propuesta: cada comisión por efectivo tiene siete días para regularizarse desde su confirmación. Los pagos verificados se aplican primero a la deuda más antigua. El bloqueo automático afecta solamente la recepción de <strong>nuevos viajes</strong>, no el acceso a la cuenta, su historial, soporte ni la finalización de viajes en curso.</p><p class="muted">Por seguridad, esta regla está preparada pero no se activa en operaciones reales hasta verificar el piloto, la liquidación y la autorización correspondiente.</p></section>
+</main><footer>BM Viajes · Acceso privado de administración · Sin operaciones comerciales reales activadas</footer>
+<script src="./config.js"></script><script src="./finanzas-ui.js" defer></script>
+</body></html>
