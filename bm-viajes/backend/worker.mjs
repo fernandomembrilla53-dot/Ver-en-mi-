@@ -6,6 +6,7 @@ import {reconcilePending} from "./mp-reconcile.mjs";
 import {createRideCheckout} from "./mp-checkout.mjs";
 import {sandboxReady,beginOAuth,finishOAuth} from "./mp-oauth.mjs";
 import { estimateUrbanFare, TARIFF } from "./tariff.mjs";
+import {checkDebtForNewRide,acceptanceDebtSql} from "./finance.mjs";
 // BM Viajes - API piloto Cloudflare Workers + D1.
 // Falla cerrado: sin ENABLE_LIVE_RIDES=true no acepta viajes reales.
 // No incluye cobros: nunca simular un pago exitoso.
@@ -180,6 +181,7 @@ async function myRides(env,user){
 }
 async function openRides(env,user){
  driverOnly(user);liveOnly(env);
+ await checkDebtForNewRide(env,user.id,ApiError);
  const result=await env.DB.prepare("SELECT id,origin_lat,origin_lng,destination_lat,destination_lng,distance_air_km,created_at FROM rides WHERE status='requested' AND expires_at>? AND rider_id<>? AND EXISTS (SELECT 1 FROM users WHERE id=? AND driver_status='approved') ORDER BY created_at LIMIT 20").bind(Date.now(),user.id,user.id).all();
  const rides=(result.results||[]).map(r=>({id:r.id,origin:{lat:Number(r.origin_lat.toFixed(3)),lng:Number(r.origin_lng.toFixed(3))},destination_area:{lat:Number(r.destination_lat.toFixed(3)),lng:Number(r.destination_lng.toFixed(3))},distance_air_km:r.distance_air_km,created_at:r.created_at}));
  const declined=await env.DB.prepare("SELECT ride_id FROM ride_declines WHERE driver_id=?").bind(user.id).all();
@@ -195,11 +197,13 @@ async function rideAccess(env,user,id){
 }
 async function acceptRide(env,user,id){
  driverOnly(user);liveOnly(env);
+ await checkDebtForNewRide(env,user.id,ApiError);
  const now=Date.now();
+ const debtSql=acceptanceDebtSql(env,now,user.id);
  const current=await env.DB.prepare("SELECT id FROM rides WHERE driver_id=? AND status IN ('accepted','in_progress') LIMIT 1").bind(user.id).first();
  if(current)throw new ApiError("Ya tenés un viaje en curso.",409);
  // Revalidar aprobación en la escritura: una suspensión concurrente impide aceptar.
- const result=await env.DB.prepare("UPDATE rides SET driver_id=?,status='accepted',updated_at=? WHERE id=? AND status='requested' AND expires_at>? AND driver_id IS NULL AND rider_id<>? AND NOT EXISTS (SELECT 1 FROM rides AS active WHERE (active.driver_id=? AND active.status IN ('accepted','in_progress')) OR (active.rider_id=? AND (active.status IN ('accepted','in_progress') OR (active.status='requested' AND active.expires_at>?)))) AND EXISTS (SELECT 1 FROM users WHERE id=? AND driver_status='approved')").bind(user.id,now,id,now,user.id,user.id,user.id,now,user.id).run();
+ const result=await env.DB.prepare("UPDATE rides SET driver_id=?,status='accepted',updated_at=? WHERE id=? AND status='requested' AND expires_at>? AND driver_id IS NULL AND rider_id<>? AND NOT EXISTS (SELECT 1 FROM rides AS active WHERE (active.driver_id=? AND active.status IN ('accepted','in_progress')) OR (active.rider_id=? AND (active.status IN ('accepted','in_progress') OR (active.status='requested' AND active.expires_at>?)))) AND EXISTS (SELECT 1 FROM users WHERE id=? AND driver_status='approved')" + debtSql.clause).bind(user.id,now,id,now,user.id,user.id,user.id,now,user.id,...debtSql.bindings).run();
  if(!result.meta?.changes)throw new ApiError("El pedido ya fue aceptado, venció o tenés otro viaje activo.",409);
  return json({ok:true,status:"accepted"});
 }
