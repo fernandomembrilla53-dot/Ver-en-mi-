@@ -54,22 +54,21 @@
             <button type="button" class="swap" id="swap">⇅ Intercambiar origen y destino</button>
             <div class="field"><label for="destination">Destino</label><div class="input-wrap"><span class="pin end"></span><input id="destination" list="places" placeholder="¿Adónde querés ir?" autocomplete="off" value=""></div></div>
             <datalist id="places"><option value=""><option value="Terminal de Ómnibus"><option value="Hospital Municipal"><option value="Estación de Tren"><option value="Zona de Quintas"><option value="Barrio La Feria"><option value="Parque Municipal"></datalist>
-            <div class="field"><label>Elegí tu vehículo</label><div class="services" id="services">
-              <button class="svc selected" data-type="economico" type="button" aria-pressed="true"><span class="emoji">🚗</span><b>BM Viajes</b><small>Hasta 4 personas</small></button>
-              <button class="svc" data-type="confort" type="button" aria-pressed="false"><span class="emoji">🚙</span><b>Confort</b><small>Más comodidad</small></button>
-              <button class="svc" data-type="xl" type="button" aria-pressed="false"><span class="emoji">🚐</span><b>BM Viajes XL</b><small>Grupo o equipaje</small></button>
+            <div class="field"><label>Elegí la modalidad</label><div class="services" id="services">
+              <button class="svc selected" data-type="one_way" type="button" aria-pressed="true"><span class="emoji">🚗</span><b>Viaje directo</b><small>$4.000 (diurno)</small></button>
+              <button class="svc" data-type="round_trip" type="button" aria-pressed="false"><span class="emoji">🚙</span><b>Ida y vuelta</b><small>Desde $6.000</small></button>
             </div></div>
             <div class="farebox">
               <div class="split"><span id="distance-label">Distancia ilustrativa</span><strong id="km">3,2 km</strong></div>
               <div class="split"><span id="time-label">Tiempo ilustrativo</span><strong id="eta">8 min</strong></div>
-              <div class="split total"><span>Tarifa ilustrativa</span><strong id="price">$ 3.760</strong></div>
+              <div class="split total"><span>Tarifa base del piloto (diurna)</span><strong id="price">$ 4.000</strong></div>
             </div>
             <div class="field"><label>Método de pago</label><div class="method">
               <label><input type="radio" name="payment" value="Efectivo" checked>Efectivo</label>
               <label><input type="radio" name="payment" value="Mercado Pago (simulado)">Mercado Pago*</label>
             </div></div>
             <button id="order" type="button" class="cta">Simular pedido de viaje →</button>
-            <p class="fine">No se realizan cobros ni se contacta a conductores. El GPS es opcional. Valores no oficiales de prueba.</p>
+            <p class="fine">Directo diurno: $4.000. Ida y vuelta diurna: $6.000, incluye 5 minutos de espera; después $250 por minuto iniciado. Directo nocturno: $4.500. Ida y vuelta nocturna sin tarifa definida. No se realizan cobros ni se contacta a conductores.</p>
           </div>
           <div id="trip-detail" class="hidden" aria-live="polite">
             <div class="trip-state">
@@ -114,14 +113,14 @@
 </main><nav class="bottom-nav" aria-label="Navegación principal"><button data-open="home" aria-current="page"><span data-icon="home"></span>Inicio</button><button data-open="options"><span data-icon="grid"></span>Opciones</button><button data-open="activity"><span data-icon="receipt"></span>Actividad</button><button data-open="account"><span data-icon="user"></span>Cuenta</button></nav><footer class="uver-footer">BM Viajes · BM-Apps · <a href="./privacidad.html">Privacidad</a> <span id="connection-status"></span></footer></div><div class="toast" id="toast" role="status" aria-live="polite"></div><script>
 (function(){
 "use strict";
-var types={economico:{label:"BM Viajes",mult:1},confort:{label:"Confort",mult:1.35},xl:{label:"BM Viajes XL",mult:1.7}};
-var selected="economico", tab="passenger", state=null, rating=0;
+var types={one_way:{label:"Viaje directo",base:4000},round_trip:{label:"Ida y vuelta",base:6000}};
+var selected="one_way", tab="passenger", state=null, rating=0;
 var $=function(id){return document.getElementById(id);};
 var money=function(n){return "$ "+Math.round(n).toLocaleString("es-AR");};
 var toastTimer;
 function toast(msg){$("toast").textContent=msg;$("toast").classList.add("show");clearTimeout(toastTimer);toastTimer=setTimeout(function(){$("toast").classList.remove("show");},2900);}
 function kmFor(a,b){if(window.BMGeo&&window.BMGeo.hasRoute()){var air=window.BMGeo.routeDistanceKm();if(Number.isFinite(air))return Math.max(.1,air);}var named=["Plaza San Martín","Terminal de Ómnibus","Hospital Municipal","Estación de Tren","Zona de Quintas","Barrio La Feria","Parque Municipal"];var i=named.indexOf(a),j=named.indexOf(b);if(i<0||j<0)return 3.2;return Number((1.4+Math.abs(i-j)*.78+((i+j)%3)*.37).toFixed(1));}
-function calc(){var a=$("origin").value.trim(),b=$("destination").value.trim(),km=kmFor(a,b),eta=(window.BMGeo?.routeMinutes?.()||Math.round(km*2.3+2)),fare=Math.ceil((1200+km*800)*types[selected].mult/10)*10;$("km").textContent=km.toLocaleString("es-AR")+" km";$("eta").textContent=eta+" min";$("price").textContent=money(fare);return {origin:a,destination:b,km:km,eta:eta,fare:fare,type:selected,payment:(document.querySelector('input[name="payment"]:checked')||{}).value||"Efectivo"};}
+function calc(){var a=$("origin").value.trim(),b=$("destination").value.trim(),km=kmFor(a,b),eta=(window.BMGeo?.routeMinutes?.()||Math.round(km*2.3+2)),fare=types[selected].base;$("km").textContent=km.toLocaleString("es-AR")+" km";$("eta").textContent=eta+" min";$("price").textContent=money(fare);return {origin:a,destination:b,km:km,eta:eta,fare:fare,type:selected,payment:(document.querySelector('input[name="payment"]:checked')||{}).value||"Efectivo"};}
 function persist(){document.dispatchEvent(new Event("uver-trip-changed"));try{localStorage.setItem("bm-viajes-demo-state",JSON.stringify(window.BMGeo?.isPrivateRoute?.()?null:state));}catch(e){}}
 function switchTab(next){tab=next;var pass=next==="passenger";$("tab-passenger").classList.toggle("active",pass);$("tab-driver").classList.toggle("active",!pass);$("tab-passenger").setAttribute("aria-selected",String(pass));$("tab-driver").setAttribute("aria-selected",String(!pass));$("passenger-panel").classList.toggle("hidden",!pass);$("driver-panel").classList.toggle("hidden",pass);render();}
 function render(){var active=!!state;$("request-form").classList.toggle("hidden",active);$("trip-detail").classList.toggle("hidden",!active);if(active){var s=state;var labels={pending:"Esperando conductor",accepted:"Conductor asignado",completed:"Viaje finalizado",cancelled:"Viaje cancelado"};$("trip-status").textContent=labels[s.status]||"Solicitud en demo";$("trip-heading").textContent=s.status==="pending"?"Buscando conductor de prueba":s.status==="accepted"?"El conductor aceptó tu viaje":s.status==="completed"?"¡Llegaste a tu destino!":"Simulación cancelada";$("trip-message").textContent=s.status==="pending"?"Entrá en «Conductor» para aceptar la solicitud y ver cómo funciona el recorrido.":s.status==="accepted"?"El conductor de prueba confirmó. Desde su panel puede finalizar el trayecto.":s.status==="completed"?"Este viaje fue simulado. Podés calificar la experiencia y comenzar otro.":"No se registró ninguna reserva real."; $("trip-route").textContent=s.origin+" → "+s.destination;$("trip-price").textContent=money(s.fare);$("trip-payment").textContent=s.payment;$("rating-wrap").classList.toggle("hidden",s.status!=="completed");$("cancel").classList.toggle("hidden",s.status==="completed"||s.status==="cancelled");$("driver-net").textContent=money(s.fare*.9);document.querySelectorAll(".star").forEach(function(el){el.classList.toggle("on",Number(el.dataset.star)<=rating);});}else{$("driver-net").textContent="$ 0";}
@@ -133,10 +132,10 @@ $("tab-passenger").addEventListener("click",function(){switchTab("passenger");})
 $("origin").addEventListener("input",calc);$("destination").addEventListener("input",calc);
 $("swap").addEventListener("click",function(){var x=$("origin").value;$("origin").value=$("destination").value;$("destination").value=x;calc();});
 document.querySelectorAll(".svc").forEach(function(b){b.addEventListener("click",function(){selected=b.dataset.type;document.querySelectorAll(".svc").forEach(function(c){var on=c===b;c.classList.toggle("selected",on);c.setAttribute("aria-pressed",String(on));});calc();});});
-$("order").addEventListener("click",function(){var c=calc();if(!c.origin||!c.destination){toast("Completá el origen y el destino.");return;}if(c.origin.toLocaleLowerCase("es-AR")===c.destination.toLocaleLowerCase("es-AR")){toast("Elegí dos puntos diferentes.");return;}rating=0;state={origin:c.origin,destination:c.destination,km:c.km,eta:c.eta,fare:c.fare,type:c.type,payment:c.payment,status:"pending"};persist();render();toast("Solicitud de prueba creada. Pasá a Conductor.");});
+$("order").addEventListener("click",function(){var c=calc();if(!c.origin||!c.destination){toast("Completá el origen y el destino.");return;}if(c.origin.toLocaleLowerCase("es-AR")===c.destination.toLocaleLowerCase("es-AR")){toast("Elegí dos puntos diferentes.");return;}rating=0;state={origin:c.origin,destination:c.destination,km:c.km,eta:c.eta,fare:c.fare,type:c.type,payment:c.payment,status:"pending",tariff_version:"ayacucho-proposal-1"};persist();render();toast("Solicitud de prueba creada. Pasá a Conductor.");});
 $("reset").addEventListener("click",function(){state=null;rating=0;persist();render();toast("Podés comenzar una nueva simulación.");});$("cancel").addEventListener("click",function(){if(state){state.status="cancelled";persist();render();toast("Simulación cancelada.");}});
 document.querySelectorAll(".star").forEach(function(b){b.addEventListener("click",function(){if(state&&state.status==="completed"){rating=Number(b.dataset.star);render();toast("¡Gracias por tu opinión de prueba!");}});});
-try{var saved=JSON.parse(localStorage.getItem("bm-viajes-demo-state")||"null");if(saved&&typeof saved.origin==="string"&&typeof saved.destination==="string"&&["pending","accepted","completed","cancelled"].indexOf(saved.status)>=0&&Number.isFinite(saved.fare)&&["economico","confort","xl"].indexOf(saved.type)>=0){state=saved;}}catch(e){}
+try{var saved=JSON.parse(localStorage.getItem("bm-viajes-demo-state")||"null");if(saved&&typeof saved.origin==="string"&&typeof saved.destination==="string"&&["pending","accepted","completed","cancelled"].indexOf(saved.status)>=0&&Number.isFinite(saved.fare)&&saved.tariff_version==="ayacucho-proposal-1"&&["one_way","round_trip"].indexOf(saved.type)>=0){state=saved;}}catch(e){}
 document.addEventListener("uver-route",calc);
 calc();render();
 })();
