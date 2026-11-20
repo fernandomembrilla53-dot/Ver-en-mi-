@@ -1,3 +1,4 @@
+import {adminFinances,driverFinance,checkDebtForNewRide} from "./finance.mjs";
 // Administrative actions are transactional with an immutable audit record.
 const kinds=['identity','license','permit','insurance','vtv'];
 export async function operations(req,env,user,{json,error,input,access,ApiError}) {
@@ -34,6 +35,7 @@ export async function operations(req,env,user,{json,error,input,access,ApiError}
   if(method==='POST'){
    const b=await body();if(typeof b.available!=='boolean')fail('Disponibilidad inválida.');
    if(b.available&&(env.ENABLE_LIVE_RIDES!=='true'))fail('Viajes reales deshabilitados.',503);
+   if(b.available)await checkDebtForNewRide(env,user.id,ApiError);
    if(b.available&&(!Number.isFinite(b.lat)||!Number.isFinite(b.lng)||Math.abs(b.lat+37.1515)>.3||Math.abs(b.lng+58.4859)>.4||!Number.isFinite(b.accuracy_m)||b.accuracy_m>300||b.accuracy_m<0))fail('Ubicación reciente y precisa requerida.');
    await db.prepare('INSERT INTO driver_availability VALUES(?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET available=excluded.available,lat=excluded.lat,lng=excluded.lng,updated_at=excluded.updated_at').bind(user.id,b.available?1:0,b.available?b.lat:null,b.available?b.lng:null,Date.now()).run();
    return json({ok:true});
@@ -43,6 +45,11 @@ export async function operations(req,env,user,{json,error,input,access,ApiError}
  if(declined&&method==='POST'){
   if(user.driver_status!=='approved')fail('Conductor sin aprobación.',403);
   await db.prepare("INSERT INTO ride_declines SELECT id,?,? FROM rides WHERE id=? AND status='requested' ON CONFLICT DO NOTHING").bind(user.id,Date.now(),declined[1]).run();return json({ok:true});
+ }
+ if(path==='/api/driver/finance'&&method==='GET'){
+  const offset=Number(url.searchParams.get('offset')||0);
+  if(!Number.isSafeInteger(offset)||offset<0||offset>100000)fail('Página inválida.');
+  return json(await driverFinance(env,user.id,{offset}));
  }
  if(path==='/api/driver/earnings'&&method==='GET'){
   const days=Number(url.searchParams.get('days')??'1');if(![1,7,30].includes(days))fail('Período inválido.');
@@ -71,6 +78,19 @@ export async function operations(req,env,user,{json,error,input,access,ApiError}
  }
  if(!path.startsWith('/api/admin/'))return null;
  if(!isAdmin)fail('Acceso administrativo requerido.',403);
+ if(path==='/api/admin/finance'&&method==='GET'){
+  const offset=Number(url.searchParams.get('offset')||0),filter=url.searchParams.get('filter')||'all';
+  if(!Number.isSafeInteger(offset)||offset<0||offset>100000||!['all','unpaid','overdue'].includes(filter))fail('Filtro o página inválidos.');
+  return json(await adminFinances(env,{offset,filter}));
+ }
+ const financeDriver=path.match(/^\/api\/admin\/finance\/([0-9a-f-]{36})$/);
+ if(financeDriver&&method==='GET'){
+  const offset=Number(url.searchParams.get('offset')||0);
+  if(!Number.isSafeInteger(offset)||offset<0||offset>100000)fail('Página inválida.');
+  const statement=await driverFinance(env,financeDriver[1],{offset});
+  if(!statement)fail('Conductor inexistente.',404);
+  return json(statement);
+ }
  if(path==='/api/admin/overview'&&method==='GET')return json({ok:true,
   users:await rows('SELECT u.id,u.email,u.driver_status,p.display_name,p.vehicle,p.plate,b.reason blocked_reason FROM users u LEFT JOIN driver_profiles p ON p.user_id=u.id LEFT JOIN blocked_users b ON b.user_id=u.id ORDER BY u.created_at DESC LIMIT 100'),
   rides:await rows('SELECT id,rider_id,driver_id,status,created_at FROM rides ORDER BY created_at DESC LIMIT 100'),
