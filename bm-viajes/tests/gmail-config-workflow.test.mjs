@@ -22,6 +22,6 @@ test('Gmail setup is manually triggered and applies only to BM Viajes worker',()
 test('Setup uses existing narrow gmail.send and documents no public refresh tokens',()=>{
  assert.match(backend,/gmail\/v1\/users\/me\/messages\/send/);
  for(const name of ['BM_VIAJES_GMAIL_CLIENT_ID','BM_VIAJES_GMAIL_CLIENT_SECRET','BM_VIAJES_GMAIL_REFRESH_TOKEN'])assert.ok(doc.includes(name));
- assert.match(doc,/No.*pegarlos en ChatGPT/);
+ assert.match(doc,/no pegarlos en ChatGPT/i);
  assert.match(doc,/siete días/i);
 });
