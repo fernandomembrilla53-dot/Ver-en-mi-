@@ -11,7 +11,7 @@ async function setup(t){
  const now=Date.now(),env={DB,AUTH_SECRET:"offline-finance-test-secret-xxxxxxxxxxxx",ENABLE_LIVE_RIDES:"false",AUTO_BLOCK_DRIVER_DEBT:"true",FRONTEND_ORIGIN:"https://finance.example.invalid"};
  const members={};
  for(const role of ["admin","driver","rider","other"]){
-  const id=crypto.randomUUID(),token=role.repeat(15).padEnd(64,"x"),hash=Buffer.from(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(token))).toString("hex");
+  const id=crypto.randomUUID(),token=Buffer.from(role.padEnd(32,"x")).toString("hex"),hash=Buffer.from(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(token))).toString("hex");
   await DB.prepare("INSERT INTO users VALUES(?,?,?,?)").bind(id,role+"@example.invalid",role==="driver"?"approved":"none",now).run();
   await DB.prepare("INSERT INTO sessions VALUES(?,?,?,?)").bind(hash,id,now+DAY,now).run();
   members[role]={id,token};
