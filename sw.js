@@ -1,10 +1,20 @@
 /* Ver en Mi: offline con actualización resiliente y caché acotada. */
-const CACHE="ver-en-mi-v13";
+const CACHE="ver-en-mi-v14";
 const FILES=["./","./index.html","./daily.js","./premium.css","./manifest.json","./icon.svg","./icon-192.png","./icon-512.png","./privacidad.html","./store.css","./store-config.js","./store.js","./assets/producto-01.jpg","./assets/producto-02.jpg","./assets/producto-03.jpg","./assets/producto-04.jpg","./assets/producto-05.jpg","./assets/producto-06.jpg","./assets/producto-07.jpg","./assets/producto-08.jpg","./assets/producto-09.jpg","./assets/producto-10.jpg","./assets/producto-11.jpg","./assets/producto-12.jpg","./assets/producto-13.jpg","./assets/producto-14.jpg","./assets/producto-15.jpg","./assets/producto-16.jpg"];
 const APP_SHELL=new URL("./index.html",self.registration.scope).href;
+// La instalación PWA no debe fallar si una imagen opcional falta o se agota
+// la cuota mientras se guardan fotografías. El núcleo offline es prioritario.
+const CORE_FILES=["./","./index.html","./daily.js","./premium.css","./manifest.json","./icon.svg"];
+const OPTIONAL_FILES=FILES.filter(path=>!CORE_FILES.includes(path));
 self.addEventListener("install",event=>{
- event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(FILES)));
- self.skipWaiting();
+ event.waitUntil((async()=>{
+  const cache=await caches.open(CACHE);
+  // Si el núcleo no puede almacenarse, no activar una versión offline incompleta.
+  await cache.addAll(CORE_FILES);
+  // Recursos secundarios: los errores individuales no invalidan la instalación.
+  await Promise.all(OPTIONAL_FILES.map(path=>cache.add(path).catch(()=>{})));
+  await self.skipWaiting();
+ })());
 });
 self.addEventListener("activate",event=>{
  event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith("ver-en-mi-")&&key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim()));
