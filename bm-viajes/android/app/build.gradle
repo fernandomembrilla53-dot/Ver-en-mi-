@@ -1,4 +1,15 @@
 plugins { id 'com.android.application' }
+
+// Clave privada exclusivamente fuera del repositorio: la firma se aplica a releases
+// solo cuando todas las variables están definidas; builds debug siguen disponibles.
+def signingEnv = [
+    storePath: System.getenv('BM_VIAJES_KEYSTORE_PATH'),
+    storePassword: System.getenv('BM_VIAJES_KEYSTORE_PASSWORD'),
+    alias: System.getenv('BM_VIAJES_KEY_ALIAS'),
+    keyPassword: System.getenv('BM_VIAJES_KEY_PASSWORD')
+]
+def hasStableSigning = signingEnv.values().every { it != null && !it.isBlank() }
+
 android {
     namespace 'com.bmapps.viajes.pilot'
     compileSdk 35
@@ -9,6 +20,27 @@ android {
         versionCode 3
         versionName '0.1.2-pilot'
     }
-    buildTypes { release { minifyEnabled false } }
+    signingConfigs {
+        pilot {
+            if (hasStableSigning) {
+                storeFile file(signingEnv.storePath)
+                storePassword signingEnv.storePassword
+                keyAlias signingEnv.alias
+                keyPassword signingEnv.keyPassword
+            }
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (hasStableSigning) signingConfig signingConfigs.pilot
+        }
+    }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+}
+// Evitar artefactos release sin firma que no permiten actualizaciones.
+gradle.taskGraph.whenReady { graph ->
+    if (graph.allTasks.any { it.name == 'assembleRelease' || it.name == 'bundleRelease' } && !hasStableSigning) {
+        throw new GradleException('Firma estable BM Viajes no configurada. Ver bm-viajes/android/SIGNING.md')
+    }
 }
