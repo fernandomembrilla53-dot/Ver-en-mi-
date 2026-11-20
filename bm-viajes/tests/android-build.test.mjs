@@ -33,8 +33,8 @@ test("BM Viajes Android: construir APK piloto con icono del lanzador en CI", {ti
   const badging = execFileSync(aapt, ["dump", "badging", apk], {encoding: "utf8", timeout: 20000});
   assert.match(badging, /application: label='BM Viajes Piloto'/, "Nombre de la aplicación incorrecto");
   assert.match(badging, /application-icon-\d+:/, "No se detectó icono del lanzador");
-  assert.match(badging, /bm_viajes_launcher\.png/, "No se incorporó el logo de BM Viajes");
-  console.log("BM_LAUNCHER_ICON_OK:bm_viajes_launcher.png");
+  assert.match(badging, /bm_viajes_launcher_v3\.xml/, "No se incorporó el logo de BM Viajes");
+  console.log("BM_LAUNCHER_ICON_OK:bm_viajes_launcher_v3.xml");
   // El job preexistente no permite upload-artifact sin modificar .github/workflows.
   // Emitir solo el APK piloto compilado (público, sin claves privadas) en bloques
   // para archivarlo por GitHub API dentro de la rama aislada.
