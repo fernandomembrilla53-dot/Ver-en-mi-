@@ -1,9 +1,6 @@
 name: BM Viajes - Configurar correo Gmail (solo OTP)
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths: ['.github/workflows/bm-viajes-gmail-only.yml']
 
 permissions:
   contents: read
@@ -17,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.BM_VIAJES_CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: d41d328f1e8a9ba2131aba8b57923f2a
       BM_VIAJES_GMAIL_CLIENT_ID: ${{ secrets.BM_VIAJES_GMAIL_CLIENT_ID }}
       BM_VIAJES_GMAIL_CLIENT_SECRET: ${{ secrets.BM_VIAJES_GMAIL_CLIENT_SECRET }}
@@ -39,7 +36,7 @@ jobs:
           if missing:
             raise SystemExit(
               'Faltan secretos de repositorio GitHub Actions: '+', '.join(missing)
-              + '. No se modificó Cloudflare.'
+              + '. Crear el secreto BM_VIAJES_CLOUDFLARE_API_TOKEN para la conexión de BM Viajes. No se modificó Cloudflare.'
             )
           if not os.environ['BM_VIAJES_GMAIL_CLIENT_ID'].endswith('.apps.googleusercontent.com'):
             raise SystemExit('El ID del cliente OAuth de Gmail no parece válido.')
