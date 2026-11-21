@@ -259,7 +259,7 @@ button.secondary{background:#fff;color:#176b4d;border:1px solid #176b4d;border-r
 <script>
 const $=id=>document.getElementById(id);
 const leer=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}};
-const guardar=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
+const guardar=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));return true}catch(_){alert('No se pudieron guardar tus datos en este dispositivo. Revisá el espacio disponible o los permisos de almacenamiento antes de continuar.');return false}};
 const hoy=()=>new Date().toLocaleDateString('sv-SE');
 function cargarPerfil(){
 const p=leer('vf_perfil',{});
@@ -270,9 +270,9 @@ function cargarHabitos(){
 const data=leer('vf_habitos',{});
 const valores=data[hoy()]||[];
 document.querySelectorAll('#habitos input').forEach(c=>c.checked=valores.includes(c.value));
-actualizarHabitos();
+actualizarHabitos(false);
 }
-function actualizarHabitos(){
+function actualizarHabitos(persistir=true){
 const checks=[...document.querySelectorAll('#habitos input')];
 const n=checks.filter(c=>c.checked).length;
 $('contador').textContent=n+' de 4 hábitos completados';
@@ -280,7 +280,7 @@ $('porcentaje').textContent=Math.round(n/4*100)+'%';
 $('barra').style.width=(n/4*100)+'%';
 const data=leer('vf_habitos',{});
 data[hoy()]=checks.filter(c=>c.checked).map(c=>c.value);
-guardar('vf_habitos',data);
+if(persistir)guardar('vf_habitos',data);
 }
 function cargarRutina(){
 const r=leer('vf_rutina',{});
@@ -299,7 +299,7 @@ document.querySelectorAll('main > section').forEach(s=>s.classList.toggle('hidde
 if(b.dataset.tab==='progreso')mostrarHistorial();
 });
 $('guardar').onclick=()=>{
-guardar('vf_perfil',{nombre:$('nombre').value.trim(),edad:$('edad').value,objetivo:$('objetivo').value,alimentacion:$('alimentacion').value});
+if(!guardar('vf_perfil',{nombre:$('nombre').value.trim(),edad:$('edad').value,objetivo:$('objetivo').value,alimentacion:$('alimentacion').value}))return;
 cargarPerfil();alert('Perfil guardado en este navegador.');
 };
 document.querySelectorAll('#habitos input').forEach(c=>c.onchange=actualizarHabitos);
@@ -318,13 +318,13 @@ const ejerciciosHoy=document.querySelectorAll('#rutina input:checked').length;
 const nuevoRegistro={fecha:hoy(),peso,nota,comidas,agua,movimiento,habitos:habitosHoy,ejercicios:ejerciciosHoy};
 const posicion=arr.findIndex(r=>r.fecha===nuevoRegistro.fecha);
 if(posicion>=0)arr[posicion]=nuevoRegistro;else arr.push(nuevoRegistro);
-guardar('vf_historial',arr);
+if(!guardar('vf_historial',arr))return;
 $('peso').value='';$('nota').value='';$('comidaDia').value='';$('aguaDia').value='';$('movimientoDia').value='';
 mostrarHistorial();alert('Registro guardado.');
 };
 $('borrar').onclick=()=>{
 if(confirm('¿Querés borrar todo el historial de progreso?')){
-guardar('vf_historial',[]);mostrarHistorial();
+if(guardar('vf_historial',[]))mostrarHistorial();
 }
 };
 
@@ -378,7 +378,7 @@ function generarPlanPersonalizado(){
   $('resultadoPlan').classList.remove('hidden');
 }
 function guardarPlanPersonalizado(){
-  guardar('vf_plan_personalizado',{
+  const guardado=guardar('vf_plan_personalizado',{
     edad:$('ppEdad').value,
     objetivo:$('ppObjetivo').value,
     alimentacion:$('ppAlimentacion').value,
@@ -386,7 +386,7 @@ function guardarPlanPersonalizado(){
     actividad:$('ppActividad').value,
     html:$('resultadoPlan').innerHTML
   });
-  alert('¡Plan guardado en este navegador!');
+  if(guardado)alert('¡Plan guardado en este navegador!');
 }
 // La propuesta diaria se gestiona en daily.js; se conservan los datos anteriores.
 
