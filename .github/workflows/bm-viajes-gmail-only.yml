@@ -64,7 +64,27 @@ jobs:
             with urllib.request.urlopen(req,timeout=20) as res:
               body=json.load(res)
           except urllib.error.HTTPError as e:
-            raise SystemExit('Token de Cloudflare rechazado (HTTP '+str(e.code)+'). Revisar CLOUDFLARE_API_TOKEN. No se modificó Cloudflare.')
+            token=os.environ['CLOUDFLARE_API_TOKEN']
+            issues=[]
+            if token.strip()!=token: issues.append('espacios o saltos al inicio/final')
+            if token.lower().startswith(('bearer ','authorization:')): issues.append('incluye prefijo Bearer/Authorization; pegar solo valor')
+            if any(c.isspace() for c in token): issues.append('contiene espacios o saltos de línea')
+            if token.startswith(('"',"'")) or token.endswith(('"',"'")): issues.append('contiene comillas')
+            if len(token)<20: issues.append('longitud demasiado corta')
+            msg=''
+            try:
+              response=json.loads(e.read().decode('utf-8'))
+              for item in response.get('errors',[])[:3]:
+                if isinstance(item,dict):
+                  code=str(item.get('code','?'))
+                  detail=str(item.get('message',''))[:150]
+                  detail=detail.replace(token,'[OCULTO]')
+                  msg+=' [error '+code+': '+detail+']'
+            except Exception:
+              pass
+            raise SystemExit('Cloudflare HTTP '+str(e.code)+msg
+              +(' [Formato sospechoso: '+', '.join(issues)+']' if issues else ' [Formato básico del token sin anomalías]')
+              +'. No se modificó Cloudflare.')
           if not body.get('success') or body.get('result',{}).get('status')!='active':
             raise SystemExit('Token Cloudflare no está activo o no se pudo verificar. No se modificó Cloudflare.')
           print('Token Cloudflare activo. Comprobando permisos sobre el Worker exacto.')
