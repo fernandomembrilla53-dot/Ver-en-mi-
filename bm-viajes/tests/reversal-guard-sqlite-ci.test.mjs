@@ -6,11 +6,11 @@ import {fileURLToPath} from 'node:url';
 import {resolve,dirname} from 'node:path';
 
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'../..');
-test('SQLite real: refund update guards, full schema and seven Python regressions',()=>{
+test('SQLite real: refund update guards, full schema and eight Python regressions',()=>{
   const r=spawnSync('python3',['-m','unittest','discover','-s','bm-viajes/backend/tests','-p','test_reversal_guards.py','-v'],{cwd:root,encoding:'utf8',timeout:20000});
   assert.equal(r.error,undefined,String(r.error));
   assert.equal(r.status,0,(r.stdout||'')+'\n'+(r.stderr||''));
-  assert.match(r.stderr,/Ran 7 tests/);
+  assert.match(r.stderr,/Ran 8 tests/);
 });
 test('Migration 0008 update guard and full schema agree',()=>{
  const schema=readFileSync(resolve(root,'bm-viajes/backend/schema.sql'),'utf8');
