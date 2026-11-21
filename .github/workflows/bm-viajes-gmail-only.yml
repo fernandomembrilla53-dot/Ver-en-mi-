@@ -1,6 +1,9 @@
 name: BM Viajes - Configurar correo Gmail (solo OTP)
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/bm-viajes-gmail-only.yml']
 
 permissions:
   contents: read
@@ -49,6 +52,24 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Diagnosticar estado del token Cloudflare sin mostrarlo
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json,os,urllib.request,urllib.error
+          req=urllib.request.Request('https://api.cloudflare.com/client/v4/user/tokens/verify',
+            headers={'Authorization':'Bearer '+os.environ['CLOUDFLARE_API_TOKEN'],
+                     'Accept':'application/json'})
+          try:
+            with urllib.request.urlopen(req,timeout=20) as res:
+              body=json.load(res)
+          except urllib.error.HTTPError as e:
+            raise SystemExit('Token de Cloudflare rechazado (HTTP '+str(e.code)+'). Revisar CLOUDFLARE_API_TOKEN. No se modificó Cloudflare.')
+          if not body.get('success') or body.get('result',{}).get('status')!='active':
+            raise SystemExit('Token Cloudflare no está activo o no se pudo verificar. No se modificó Cloudflare.')
+          print('Token Cloudflare activo. Comprobando permisos sobre el Worker exacto.')
+          PY
+
       - name: Verificar destino exclusivo y Worker existente
         shell: bash
         run: |
@@ -68,7 +89,18 @@ jobs:
             with urllib.request.urlopen(req,timeout=20) as response:
               if response.status != 200: raise RuntimeError('Worker no disponible')
           except urllib.error.HTTPError as e:
-            raise SystemExit('No se pudo comprobar bm-viajes-api. Cloudflare HTTP '+str(e.code)+'. Verificá permisos del token.')
+            details=''
+            try:
+              body=json.loads(e.read().decode('utf-8'))
+              errors=body.get('errors',[])
+              details='; '.join(
+                str(item.get('code','?'))+': '+str(item.get('message',''))[:140]
+                for item in errors[:2] if isinstance(item,dict))
+              details=details.replace(os.environ['CLOUDFLARE_API_TOKEN'],'[OCULTO]')
+            except Exception:
+              pass
+            raise SystemExit('Cloudflare rechazó verificación de bm-viajes-api: HTTP '+str(e.code)
+              +(('; '+details) if details else '')+'. No se modificó Cloudflare.')
           print('Comprobado Worker bm-viajes-api. No se desplegará código ni se ejecutará D1.')
           PY
 
