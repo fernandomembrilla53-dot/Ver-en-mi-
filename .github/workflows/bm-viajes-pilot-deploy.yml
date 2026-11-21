@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.BM_VIAJES_CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: d41d328f1e8a9ba2131aba8b57923f2a
       WRANGLER_SEND_METRICS: 'false'
     steps:
@@ -113,7 +113,7 @@ jobs:
           GMAIL_CLIENT_ID: ${{ secrets.BM_VIAJES_GMAIL_CLIENT_ID }}
           GMAIL_CLIENT_SECRET: ${{ secrets.BM_VIAJES_GMAIL_CLIENT_SECRET }}
           GMAIL_REFRESH_TOKEN: ${{ secrets.BM_VIAJES_GMAIL_REFRESH_TOKEN }}
-          GMAIL_SENDER_EMAIL: ${{ secrets.BM_VIAJES_GMAIL_SENDER_EMAIL }}
+          GMAIL_SENDER_EMAIL: fernandomembrilla53@gmail.com
         run: |
           python3 - <<'PY'
           import os,subprocess
