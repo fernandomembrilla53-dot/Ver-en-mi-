@@ -92,6 +92,27 @@ class ReversalGuardTests(unittest.TestCase):
         with self.assertRaises(sqlite3.IntegrityError):
             self.db.execute("UPDATE mp_payment_reversals SET kind='refund' WHERE payment_id='pay'")
 
+    def test_migration_applies_twice_and_preserves_existing_reversal(self):
+        # Emulate a pre-0008 database: the schema contains the new trigger,
+        # but the production database has not applied the additive migration.
+        self.reversal("partial_refund", 1000)
+        self.db.execute("DROP TRIGGER IF EXISTS mp_reversal_update_guard")
+        migration = (BACKEND / "migrations" / "0008_mp_reversal_update_guard.sql").read_text(encoding="utf-8")
+        self.db.executescript(migration)
+        self.db.executescript(migration)
+        self.assertEqual(
+            self.db.execute("SELECT kind,amount_ars FROM mp_payment_reversals WHERE payment_id='pay'").fetchone(),
+            ("partial_refund", 1000),
+        )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                "UPDATE mp_payment_reversals SET amount_ars=4000 WHERE payment_id='pay'"
+            )
+        self.assertEqual(
+            self.db.execute("SELECT amount_ars FROM mp_payment_reversals WHERE payment_id='pay'").fetchone()[0],
+            1000,
+        )
+
     def test_duplicate_insert_rejected(self):
         self.reversal("partial_refund", 1000)
         with self.assertRaises(sqlite3.IntegrityError):
