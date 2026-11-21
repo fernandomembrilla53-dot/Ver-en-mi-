@@ -1,0 +1,73 @@
+name: BM Viajes - Diagnosticar Gmail sin mostrar credenciales
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-gmail:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    env:
+      BM_VIAJES_GMAIL_CLIENT_ID: ${{ secrets.BM_VIAJES_GMAIL_CLIENT_ID }}
+      BM_VIAJES_GMAIL_CLIENT_SECRET: ${{ secrets.BM_VIAJES_GMAIL_CLIENT_SECRET }}
+      BM_VIAJES_GMAIL_REFRESH_TOKEN: ${{ secrets.BM_VIAJES_GMAIL_REFRESH_TOKEN }}
+    steps:
+      - name: Diagnosticar OAuth Gmail y un envio de prueba al propietario
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import base64,json,os,urllib.parse,urllib.request,urllib.error
+          from email.message import EmailMessage
+          names=['BM_VIAJES_GMAIL_CLIENT_ID','BM_VIAJES_GMAIL_CLIENT_SECRET','BM_VIAJES_GMAIL_REFRESH_TOKEN']
+          missing=[n for n in names if not os.getenv(n)]
+          if missing:
+            raise SystemExit('Faltan secretos configurados: '+', '.join(missing))
+          def request(req,label):
+            try:
+              with urllib.request.urlopen(req,timeout=25) as response:
+                return json.load(response)
+            except urllib.error.HTTPError as exc:
+              try:
+                info=json.loads(exc.read().decode())
+              except Exception:
+                info={}
+              err=info.get('error',{})
+              code=err if isinstance(err,str) else err.get('status','unknown')
+              if not isinstance(code,str) or code not in {'invalid_grant','invalid_client','unauthorized_client','invalid_request','access_denied','PERMISSION_DENIED','UNAUTHENTICATED','INVALID_ARGUMENT','RESOURCE_EXHAUSTED','FAILED_PRECONDITION'}:
+                code='other'
+              print(label+': HTTP '+str(exc.code)+'; error_code='+code)
+              if label=='OAuth':
+                print('invalid_grant: refresh token revocado, vencido o de otro cliente. invalid_client: Client ID y Client Secret no coinciden.')
+              elif exc.code==403:
+                print('Gmail: comprobar que Gmail API este habilitada y que se autorizo gmail.send.')
+              raise SystemExit(label+' no se pudo completar (sin revelar credenciales).')
+            except Exception as e:
+              raise SystemExit(label+' fallo por conexion: '+type(e).__name__)
+          form=urllib.parse.urlencode({
+            'client_id':os.environ[names[0]],
+            'client_secret':os.environ[names[1]],
+            'refresh_token':os.environ[names[2]],
+            'grant_type':'refresh_token'
+          }).encode()
+          token=request(urllib.request.Request('https://oauth2.googleapis.com/token',data=form,headers={'Content-Type':'application/x-www-form-urlencoded'},method='POST'),'OAuth')
+          access=token.get('access_token')
+          if not access:raise SystemExit('OAuth no devolvio access_token.')
+          print('OAuth: refresh token aceptado y access_token obtenido.')
+          msg=EmailMessage()
+          msg['From']='BM Viajes <fernandomembrilla53@gmail.com>'
+          msg['To']='fernandomembrilla53@gmail.com'
+          msg['Subject']='BM Viajes: prueba de envio Gmail'
+          msg.set_content('Prueba tecnica de Gmail para BM Viajes. No es un codigo de acceso.')
+          raw=base64.urlsafe_b64encode(msg.as_bytes()).decode().rstrip('=')
+          req=urllib.request.Request('https://gmail.googleapis.com/gmail/v1/users/me/messages/send',
+            data=json.dumps({'raw':raw}).encode(),
+            headers={'Authorization':'Bearer '+access,'Content-Type':'application/json'},
+            method='POST')
+          result=request(req,'Gmail API')
+          if not result.get('id'):raise SystemExit('Gmail API no devolvio confirmacion.')
+          print('Gmail API: correo de prueba aceptado para la cuenta del propietario.')
+          print('Verificar la recepcion en Gmail; no se imprimio codigo, token ni contenido privado.')
+          PY
