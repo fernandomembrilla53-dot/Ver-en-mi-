@@ -3,7 +3,7 @@
 'use strict';
 const el=id=>document.getElementById(id);
 const read=(key,fallback)=>{try{const value=JSON.parse(localStorage.getItem(key));return value===null?fallback:value}catch(_){return fallback}};
-const save=(key,value)=>{try{localStorage.setItem(key,JSON.stringify(value))}catch(_){}};
+const save=(key,value)=>{try{localStorage.setItem(key,JSON.stringify(value));return true}catch(_){alert('No se pudieron guardar tus cambios en este dispositivo. Revisá el espacio disponible o los permisos de almacenamiento.');return false}};
 const safe=s=>String(s??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const dateKey=(date)=>[date.getFullYear(),String(date.getMonth()+1).padStart(2,'0'),String(date.getDate()).padStart(2,'0')].join('-');
 const dayNumber=d=>Math.floor(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/86400000);
@@ -224,7 +224,8 @@ function storeMyPlan(){
  const age=Number(el('ppEdad').value);
  if(!Number.isInteger(age)||age<18||age>100){alert('Ingresá una edad válida entre 18 y 100 años.');return}
  const data={edad:String(age),objetivo:el('ppObjetivo').value,alimentacion:el('ppAlimentacion').value,presupuesto:el('ppPresupuesto').value,actividad:el('ppActividad').value};
- save('vf_plan_personalizado',data);save('vem_nivel',data.actividad);
+ if(!save('vf_plan_personalizado',data))return;
+ save('vem_nivel',data.actividad);
  renderAll();renderMyPlan();
 }
 function enhanceProgress(){
