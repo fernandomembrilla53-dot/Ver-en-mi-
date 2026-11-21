@@ -175,6 +175,18 @@ class ReversalGuardTests(unittest.TestCase):
         finally:
             legacy.close()
 
+    def test_reversal_cannot_be_reassigned_to_another_payment(self):
+        # A provider update must not move an existing reversal to a different payment.
+        self.reversal("partial_refund", 1000)
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                "UPDATE mp_payment_reversals SET payment_id='other' WHERE payment_id='pay'"
+            )
+        self.assertEqual(
+            self.db.execute("SELECT payment_id,kind,amount_ars FROM mp_payment_reversals").fetchone(),
+            ("pay", "partial_refund", 1000),
+        )
+
     def test_duplicate_insert_rejected(self):
         self.reversal("partial_refund", 1000)
         with self.assertRaises(sqlite3.IntegrityError):
